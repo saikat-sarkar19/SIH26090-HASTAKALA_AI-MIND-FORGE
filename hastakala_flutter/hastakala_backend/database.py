@@ -190,6 +190,7 @@ def init_db(mongodb_uri: str = None):
     CREATE TABLE IF NOT EXISTS products (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         artisan_id INTEGER DEFAULT 1,
+        artisan_username TEXT DEFAULT '',
         title TEXT NOT NULL,
         description_en TEXT NOT NULL,
         description_hi TEXT NOT NULL,
@@ -208,6 +209,15 @@ def init_db(mongodb_uri: str = None):
         created_at TEXT NOT NULL
     );
     """)
+
+    cursor.execute("PRAGMA table_info(products)")
+    p_cols = [r[1] for r in cursor.fetchall()]
+    if "artisan_username" not in p_cols:
+        try:
+            cursor.execute("ALTER TABLE products ADD COLUMN artisan_username TEXT DEFAULT ''")
+            conn.commit()
+        except Exception as e:
+            print(f"Products column migration note: {e}")
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS buyers (
         id INTEGER PRIMARY KEY AUTOINCREMENT,

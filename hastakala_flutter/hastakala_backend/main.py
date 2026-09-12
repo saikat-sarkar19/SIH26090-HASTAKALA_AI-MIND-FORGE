@@ -21,7 +21,10 @@ from hastakala_backend.services.assistant_service import chat_with_assistant
 from hastakala_backend.services.buyer_service import get_verified_buyers, get_product_enquiries
 
 # Initialize Database
-init_db()
+try:
+    init_db()
+except Exception as _e:
+    print(f"Database init warning: {_e}")
 
 app = FastAPI(
     title="Hastakala AI Backend API",

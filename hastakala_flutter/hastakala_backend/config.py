@@ -1,16 +1,29 @@
 import os
+import tempfile
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
-UPLOAD_DIR = BASE_DIR / "uploads"
-ENHANCED_DIR = BASE_DIR / "uploads" / "enhanced"
-AUDIO_DIR = BASE_DIR / "uploads" / "audio"
 
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-ENHANCED_DIR.mkdir(parents=True, exist_ok=True)
-AUDIO_DIR.mkdir(parents=True, exist_ok=True)
+IS_VERCEL = os.getenv("VERCEL") == "1" or "AWS_LAMBDA_FUNCTION_NAME" in os.environ
 
-DB_PATH = BASE_DIR / "hastakala.db"
+if IS_VERCEL:
+    TEMP_DIR = Path(tempfile.gettempdir())
+    UPLOAD_DIR = TEMP_DIR / "uploads"
+    ENHANCED_DIR = TEMP_DIR / "uploads" / "enhanced"
+    AUDIO_DIR = TEMP_DIR / "uploads" / "audio"
+    DB_PATH = TEMP_DIR / "hastakala.db"
+else:
+    UPLOAD_DIR = BASE_DIR / "uploads"
+    ENHANCED_DIR = BASE_DIR / "uploads" / "enhanced"
+    AUDIO_DIR = BASE_DIR / "uploads" / "audio"
+    DB_PATH = BASE_DIR / "hastakala.db"
+
+try:
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    ENHANCED_DIR.mkdir(parents=True, exist_ok=True)
+    AUDIO_DIR.mkdir(parents=True, exist_ok=True)
+except Exception:
+    pass
 
 # MongoDB Database Configuration
 MONGODB_URI = os.getenv("MONGODB_URI", "mongodb+srv://pinturay2010_db_user:jgIBYlgVRdIRuS8W@cluster0.d7y3jzy.mongodb.net/hastakala_db?retryWrites=true&w=majority")
