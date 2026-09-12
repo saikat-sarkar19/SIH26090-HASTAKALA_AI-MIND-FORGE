@@ -6,6 +6,10 @@ class ApiService {
   // Base URL configuration for different environments
   static String get baseUrl {
     if (kIsWeb) {
+      final origin = Uri.base.origin;
+      if (origin.isNotEmpty && !origin.contains('localhost') && !origin.contains('127.0.0.1') && !origin.contains(':3000')) {
+        return origin;
+      }
       final host = Uri.base.host.isNotEmpty ? Uri.base.host : '127.0.0.1';
       return 'http://$host:8000';
     }
