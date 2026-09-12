@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
@@ -50,6 +51,294 @@ Widget logo({double width = 150}) => Image.asset(
   fit: BoxFit.contain,
   errorBuilder: (ctx, err, stack) => Icon(Icons.palette_outlined, size: width * 0.6, color: AppColors.gold),
 );
+
+Map<String, dynamic>? currentArtisanSession = {
+  'id': 1,
+  'name': 'Ramesh Kumar',
+  'username': 'ramesh_artisan',
+  'phone': '9876543210',
+  'gender': 'Male',
+  'craft_type': 'Master Weaver & Bamboo Craftsman',
+  'location': 'Varanasi, Uttar Pradesh',
+  'profile_picture': '',
+};
+
+Map<String, Map<String, dynamic>> defaultAvatarPresets = {
+  'preset:weaver': {'name': 'Handloom Weaver', 'color': Color(0xFF7A0B2E), 'icon': Icons.texture},
+  'preset:potter': {'name': 'Pottery Craftsman', 'color': Color(0xFFD8703C), 'icon': Icons.soup_kitchen_outlined},
+  'preset:bamboo': {'name': 'Bamboo Artisan', 'color': Color(0xFF2E7D32), 'icon': Icons.eco_outlined},
+  'preset:painter': {'name': 'Heritage Artist', 'color': Color(0xFFE87872), 'icon': Icons.palette_outlined},
+  'preset:master': {'name': 'Master Craftsman', 'color': Color(0xFFD8A54A), 'icon': Icons.workspace_premium_outlined},
+};
+
+Widget buildArtisanAvatar({
+  double radius = 24,
+  Map<String, dynamic>? session,
+  VoidCallback? onTap,
+  bool showEditBadge = false,
+}) {
+  final s = session ?? currentArtisanSession;
+  final name = s?['name'] ?? 'Artisan';
+  final pic = (s?['profile_picture'] ?? '').toString();
+  final initial = name.isNotEmpty ? name.substring(0, 1).toUpperCase() : 'A';
+
+  Widget avatarWidget;
+
+  if (pic.startsWith('preset:')) {
+    final presetInfo = defaultAvatarPresets[pic] ?? defaultAvatarPresets['preset:weaver']!;
+    avatarWidget = CircleAvatar(
+      radius: radius,
+      backgroundColor: presetInfo['color'] as Color,
+      child: Icon(presetInfo['icon'] as IconData, color: Colors.white, size: radius * 1.1),
+    );
+  } else if (pic.isNotEmpty) {
+    ImageProvider? bgImage;
+    if (pic.startsWith('http://') || pic.startsWith('https://')) {
+      bgImage = NetworkImage(pic);
+    } else if (pic.startsWith('data:image') || pic.length > 50) {
+      try {
+        final cleanBase64 = pic.contains(',') ? pic.split(',').last : pic;
+        final bytes = base64Decode(cleanBase64.replaceAll(RegExp(r'\s+'), ''));
+        bgImage = MemoryImage(bytes);
+      } catch (e) {
+        debugPrint('Avatar base64 parse error: $e');
+      }
+    }
+    avatarWidget = CircleAvatar(
+      radius: radius,
+      backgroundColor: AppColors.wine,
+      backgroundImage: bgImage,
+      child: bgImage == null
+          ? Text(initial, style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: radius * 0.85))
+          : null,
+    );
+  } else {
+    avatarWidget = CircleAvatar(
+      radius: radius,
+      backgroundColor: AppColors.wine,
+      child: Text(
+        initial,
+        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: radius * 0.85),
+      ),
+    );
+  }
+
+  if (showEditBadge) {
+    avatarWidget = Stack(
+      clipBehavior: Clip.none,
+      children: [
+        avatarWidget,
+        Positioned(
+          right: -2,
+          bottom: -2,
+          child: Container(
+            padding: const EdgeInsets.all(5),
+            decoration: const BoxDecoration(
+              color: AppColors.wine,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.camera_alt, size: 12, color: Colors.white),
+          ),
+        ),
+      ],
+    );
+  }
+
+  if (onTap != null) {
+    return GestureDetector(onTap: onTap, child: avatarWidget);
+  }
+  return avatarWidget;
+}
+
+Future<void> saveArtisanProfilePicture(BuildContext context, String pictureValue, {VoidCallback? onUpdated}) async {
+  try {
+    if (currentArtisanSession != null) {
+      final username = (currentArtisanSession!['username'] ?? '').toString().trim();
+      final phone = (currentArtisanSession!['phone'] ?? '').toString().trim();
+      final targetIdentifier = username.isNotEmpty ? username : phone;
+
+      currentArtisanSession!['profile_picture'] = pictureValue;
+      if (onUpdated != null) onUpdated();
+
+      final res = await ApiService.updateArtisanProfile(
+        username: targetIdentifier,
+        fullName: currentArtisanSession!['name'],
+        phone: currentArtisanSession!['phone'],
+        gender: currentArtisanSession!['gender'],
+        craftType: currentArtisanSession!['craft_type'],
+        location: currentArtisanSession!['location'],
+        profilePicture: pictureValue,
+      );
+
+      if (res != null && res['status'] == 'success' && res['artisan'] != null) {
+        currentArtisanSession = res['artisan'];
+        if (onUpdated != null) onUpdated();
+      }
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profile picture updated successfully! 📸')),
+        );
+      }
+    }
+  } catch (e) {
+    debugPrint('Error saving profile picture: $e');
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update picture: $e')),
+      );
+    }
+  }
+}
+
+Future<void> pickArtisanProfilePicture(BuildContext context, {VoidCallback? onUpdated}) async {
+  try {
+    String? b64Data;
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(source: ImageSource.gallery, maxWidth: 600, maxHeight: 600, imageQuality: 75);
+    if (picked != null) {
+      final bytes = await picked.readAsBytes();
+      b64Data = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+    } else {
+      final res = await FilePicker.platform.pickFiles(type: FileType.image, withData: true);
+      if (res != null && res.files.isNotEmpty && res.files.first.bytes != null) {
+        b64Data = 'data:image/jpeg;base64,${base64Encode(res.files.first.bytes!)}';
+      }
+    }
+
+    if (b64Data != null) {
+      await saveArtisanProfilePicture(context, b64Data, onUpdated: onUpdated);
+    }
+  } catch (e) {
+    debugPrint('Error picking profile picture: $e');
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to pick picture: $e')),
+      );
+    }
+  }
+}
+
+Future<void> showProfileAvatarPickerModal(BuildContext context, {VoidCallback? onUpdated}) async {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (modalCtx) => Container(
+      padding: const EdgeInsets.all(24),
+      decoration: const BoxDecoration(
+        color: AppColors.cream,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(color: Colors.grey.shade400, borderRadius: BorderRadius.circular(2)),
+            ),
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Set Profile Picture 📸', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.wine)),
+              IconButton(icon: const Icon(Icons.close, color: AppColors.muted), onPressed: () => Navigator.pop(modalCtx)),
+            ],
+          ),
+          const Divider(),
+          const SizedBox(height: 12),
+
+          const Text('Choose from 5 Default Artisan Icons:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.wine)),
+          const SizedBox(height: 14),
+
+          // 5 Default Avatar Options
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: defaultAvatarPresets.entries.map((entry) {
+              final key = entry.key;
+              final val = entry.value;
+              final color = val['color'] as Color;
+              final icon = val['icon'] as IconData;
+              final name = val['name'] as String;
+              final isSelected = (currentArtisanSession?['profile_picture'] ?? '') == key;
+
+              return GestureDetector(
+                onTap: () async {
+                  Navigator.pop(modalCtx);
+                  await saveArtisanProfilePicture(context, key, onUpdated: onUpdated);
+                },
+                child: Column(
+                  children: [
+                    Stack(
+                      children: [
+                        CircleAvatar(
+                          radius: 26,
+                          backgroundColor: color,
+                          child: Icon(icon, color: Colors.white, size: 28),
+                        ),
+                        if (isSelected)
+                          Positioned(
+                            right: 0,
+                            top: 0,
+                            child: Container(
+                              padding: const EdgeInsets.all(2),
+                              decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle),
+                              child: const Icon(Icons.check, size: 12, color: Colors.white),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    SizedBox(
+                      width: 60,
+                      child: Text(
+                        name.split(' ').first,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                          color: isSelected ? AppColors.wine : AppColors.muted,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+
+          const SizedBox(height: 20),
+          const Divider(),
+          const SizedBox(height: 12),
+
+          // Upload Custom Photo Button
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: OutlinedButton.icon(
+              onPressed: () async {
+                Navigator.pop(modalCtx);
+                await pickArtisanProfilePicture(context, onUpdated: onUpdated);
+              },
+              icon: const Icon(Icons.photo_library_outlined, color: AppColors.wine),
+              label: const Text('Upload Photo from Device / Gallery 📁', style: TextStyle(color: AppColors.wine, fontWeight: FontWeight.bold, fontSize: 14)),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: AppColors.wine, width: 1.5),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+      ),
+    ),
+  );
+}
+
 
 class AppButton extends StatelessWidget {
   final String text;
@@ -132,55 +421,524 @@ class SplashScreen extends StatelessWidget {
   );
 }
 
-class LoginScreen extends StatelessWidget {
+class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
   @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  final TextEditingController usernameCtrl = TextEditingController();
+  final TextEditingController passwordCtrl = TextEditingController();
+  final FocusNode usernameFocusNode = FocusNode();
+  final FocusNode passwordFocusNode = FocusNode();
+  bool obscurePassword = true;
+  bool loading = false;
+
+  @override
+  void dispose() {
+    usernameCtrl.dispose();
+    passwordCtrl.dispose();
+    usernameFocusNode.dispose();
+    passwordFocusNode.dispose();
+    super.dispose();
+  }
+
+  void _handleLogin() async {
+    final username = usernameCtrl.text.trim();
+    final password = passwordCtrl.text.trim();
+
+    if (username.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter both username and password.')),
+      );
+      return;
+    }
+
+    setState(() => loading = true);
+    try {
+      final res = await ApiService.loginArtisan(username, password);
+      if (!mounted) return;
+
+      if (res != null && res['status'] == 'success') {
+        currentArtisanSession = res['artisan'];
+        final artisanName = res['artisan']?['name'] ?? 'Artisan';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Welcome back, $artisanName! 🎉')),
+        );
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
+        );
+      } else {
+        final detail = res?['detail'] ?? 'Invalid username or password. Please check your credentials.';
+        passwordCtrl.clear();
+        passwordFocusNode.requestFocus();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(detail),
+            backgroundColor: Colors.red.shade800,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Login error: $e'), backgroundColor: Colors.red.shade800),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => loading = false);
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) => Scaffold(
-    body: Stack(
+    backgroundColor: AppColors.deepWine,
+    body: SafeArea(
+      child: Column(
+        children: [
+          Expanded(
+            flex: 3,
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                child: logo(width: 190),
+              ),
+            ),
+          ),
+          Expanded(
+            flex: 7,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+              decoration: const BoxDecoration(
+                color: AppColors.cream,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text('Welcome to Hastakala', textAlign: TextAlign.center, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.wine)),
+                    const SizedBox(height: 6),
+                    const Text('Sign in to your artisan business account', textAlign: TextAlign.center, style: TextStyle(color: AppColors.muted, fontSize: 13)),
+                    const SizedBox(height: 24),
+
+                    TextField(
+                      controller: usernameCtrl,
+                      focusNode: usernameFocusNode,
+                      enabled: !loading,
+                      textInputAction: TextInputAction.next,
+                      onSubmitted: (_) => passwordFocusNode.requestFocus(),
+                      decoration: InputDecoration(
+                        prefixIcon: const Icon(Icons.person_outlined, color: AppColors.wine),
+                        labelText: 'Username or Phone',
+                        hintText: 'Enter username or phone',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    TextField(
+                      controller: passwordCtrl,
+                      focusNode: passwordFocusNode,
+                      enabled: !loading,
+                      obscureText: obscurePassword,
+                      textInputAction: TextInputAction.done,
+                      onSubmitted: (_) => loading ? null : _handleLogin(),
+                      onChanged: (_) => setState(() {}),
+                      decoration: InputDecoration(
+                        prefixIcon: const Icon(Icons.lock_outlined, color: AppColors.wine),
+                        suffixIcon: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (passwordCtrl.text.isNotEmpty)
+                              IconButton(
+                                icon: const Icon(Icons.cancel, color: AppColors.muted, size: 18),
+                                onPressed: () => setState(() => passwordCtrl.clear()),
+                              ),
+                            IconButton(
+                              icon: Icon(obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined, color: AppColors.muted),
+                              onPressed: () => setState(() => obscurePassword = !obscurePassword),
+                            ),
+                          ],
+                        ),
+                        labelText: 'Password',
+                        hintText: 'Enter password',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    SizedBox(
+                      height: 52,
+                      child: ElevatedButton(
+                        onPressed: loading ? null : _handleLogin,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.wine,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        ),
+                        child: loading
+                            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                            : const Text('Sign In 🚀', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text("Don't have an account? ", style: TextStyle(color: AppColors.muted, fontSize: 13)),
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const RegisterScreen()),
+                            );
+                          },
+                          child: const Text(
+                            'Create New Account',
+                            style: TextStyle(color: AppColors.wine, fontWeight: FontWeight.bold, fontSize: 13, decoration: TextDecoration.underline),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+
+                    TextButton(
+                      onPressed: () {
+                        currentArtisanSession = {
+                          'id': 0,
+                          'name': 'Guest Artisan',
+                          'username': 'guest',
+                          'phone': 'N/A',
+                          'gender': 'Artisan',
+                          'craft_type': 'Handloom & Handicrafts',
+                          'location': 'India',
+                        };
+                        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
+                      },
+                      child: const Text('Continue as Guest Artisan', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w600, fontSize: 13)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class RegisterScreen extends StatefulWidget {
+  const RegisterScreen({super.key});
+
+  @override
+  State<RegisterScreen> createState() => _RegisterScreenState();
+}
+
+class _RegisterScreenState extends State<RegisterScreen> {
+  final TextEditingController fullNameCtrl = TextEditingController();
+  final TextEditingController usernameCtrl = TextEditingController();
+  final TextEditingController phoneCtrl = TextEditingController();
+  final TextEditingController addressCtrl = TextEditingController();
+  final TextEditingController passwordCtrl = TextEditingController();
+  final TextEditingController confirmPasswordCtrl = TextEditingController();
+
+  String selectedGender = 'Male';
+  String selectedCraft = 'Handloom Weaving & Textiles';
+  bool obscurePassword = true;
+  bool obscureConfirmPassword = true;
+  bool loading = false;
+
+  final List<String> craftOptions = [
+    'Handloom Weaving & Textiles',
+    'Terracotta Pottery & Bio-Clay',
+    'Bamboo & Cane Craft',
+    'Wood Carving & Handicrafts',
+    'Metal Dokra & Brassware',
+    'Artisanal Footwear & Leather',
+    'Heritage Crafts & Other',
+  ];
+
+  void _handleRegister() async {
+    final fullName = fullNameCtrl.text.trim();
+    final username = usernameCtrl.text.trim();
+    final phone = phoneCtrl.text.trim();
+    final address = addressCtrl.text.trim();
+    final password = passwordCtrl.text.trim();
+    final confirmPassword = confirmPasswordCtrl.text.trim();
+
+    if (fullName.isEmpty || username.isEmpty || phone.isEmpty || address.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill in all required fields.')),
+      );
+      return;
+    }
+
+    if (password != confirmPassword) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Passwords do not match! Please check password confirmation.')),
+      );
+      return;
+    }
+
+    if (password.length < 4) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Password must be at least 4 characters long.')),
+      );
+      return;
+    }
+
+    setState(() => loading = true);
+
+    final res = await ApiService.registerArtisan(
+      fullName: fullName,
+      username: username,
+      phone: phone,
+      gender: selectedGender,
+      craftType: selectedCraft,
+      address: address,
+      password: password,
+    );
+
+    if (!mounted) return;
+    setState(() => loading = false);
+
+    if (res != null && res['status'] == 'success') {
+      currentArtisanSession = res['artisan'];
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Registration successful! Welcome to Hastakala, $fullName! 🎉')),
+      );
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
+      );
+    } else {
+      final detail = res?['detail'] ?? 'Registration failed. Please try again.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(detail)),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: AppColors.deepWine,
+    appBar: AppBar(
+      backgroundColor: AppColors.deepWine,
+      elevation: 0,
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back, color: Colors.white),
+        onPressed: () => Navigator.pop(context),
+      ),
+      title: const Text('New Artisan Registration', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+    ),
+    body: Column(
       children: [
         Container(
-          height: MediaQuery.of(context).size.height * .48,
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(colors: [AppColors.deepWine, AppColors.wine]),
-          ),
-          child: Center(child: logo(width: 200)),
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Center(child: logo(width: 140)),
         ),
-        Align(
-          alignment: Alignment.bottomCenter,
+        Expanded(
           child: Container(
-            height: MediaQuery.of(context).size.height * .58,
-            padding: const EdgeInsets.all(28),
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
             decoration: const BoxDecoration(
               color: AppColors.cream,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
             ),
-            child: Column(
-              children: [
-                const Text('Welcome to Hastakala', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                const Text('Your AI business manager for artisans', style: TextStyle(color: AppColors.muted)),
-                const SizedBox(height: 24),
-                TextField(
-                  keyboardType: TextInputType.phone,
-                  decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.phone_outlined),
-                    labelText: 'Mobile Number',
-                    hintText: '98765 43210',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Create Your Account', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.wine)),
+                  const SizedBox(height: 4),
+                  const Text('Join the global digital network of traditional Indian artisans', style: TextStyle(color: AppColors.muted, fontSize: 12)),
+                  const SizedBox(height: 20),
+
+                  const Text('Full Name *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.wine)),
+                  const SizedBox(height: 4),
+                  TextField(
+                    controller: fullNameCtrl,
+                    decoration: InputDecoration(
+                      prefixIcon: const Icon(Icons.badge_outlined, color: AppColors.wine),
+                      hintText: 'e.g. Ramesh Kumar',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                AppButton(
-                  text: 'Get OTP',
-                  onPressed: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen())),
-                ),
-                const SizedBox(height: 12),
-                TextButton(
-                  onPressed: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen())),
-                  child: const Text('Continue as Guest Artisan', style: TextStyle(color: AppColors.wine, fontWeight: FontWeight.w600)),
-                ),
-              ],
+                  const SizedBox(height: 14),
+
+                  const Text('Username *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.wine)),
+                  const SizedBox(height: 4),
+                  TextField(
+                    controller: usernameCtrl,
+                    decoration: InputDecoration(
+                      prefixIcon: const Icon(Icons.alternate_email, color: AppColors.wine),
+                      hintText: 'e.g. ramesh_artisan',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  const Text('Phone Number *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.wine)),
+                  const SizedBox(height: 4),
+                  TextField(
+                    controller: phoneCtrl,
+                    keyboardType: TextInputType.phone,
+                    decoration: InputDecoration(
+                      prefixIcon: const Icon(Icons.phone_outlined, color: AppColors.wine),
+                      hintText: 'e.g. 9876543210',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  const Text('Gender *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.wine)),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: ['Male', 'Female', 'Other'].map((g) {
+                      final isSelected = selectedGender == g;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 10),
+                        child: ChoiceChip(
+                          label: Text(g == 'Male' ? '👨 Male' : (g == 'Female' ? '👩 Female' : '🧑 Other')),
+                          selected: isSelected,
+                          selectedColor: AppColors.wine,
+                          backgroundColor: Colors.white,
+                          labelStyle: TextStyle(
+                            color: isSelected ? Colors.white : AppColors.wine,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            fontSize: 12,
+                          ),
+                          onSelected: (bool sel) {
+                            if (sel) setState(() => selectedGender = g);
+                          },
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 14),
+
+                  const Text('Craft Specialty / Category *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.wine)),
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: Colors.grey.shade400),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: selectedCraft,
+                        isExpanded: true,
+                        icon: const Icon(Icons.arrow_drop_down, color: AppColors.wine),
+                        items: craftOptions.map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 13)))).toList(),
+                        onChanged: (val) {
+                          if (val != null) setState(() => selectedCraft = val);
+                        },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  const Text('Address / Location *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.wine)),
+                  const SizedBox(height: 4),
+                  TextField(
+                    controller: addressCtrl,
+                    decoration: InputDecoration(
+                      prefixIcon: const Icon(Icons.location_on_outlined, color: AppColors.wine),
+                      hintText: 'e.g. Varanasi, Uttar Pradesh',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  const Text('Create Password *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.wine)),
+                  const SizedBox(height: 4),
+                  TextField(
+                    controller: passwordCtrl,
+                    obscureText: obscurePassword,
+                    decoration: InputDecoration(
+                      prefixIcon: const Icon(Icons.lock_outlined, color: AppColors.wine),
+                      suffixIcon: IconButton(
+                        icon: Icon(obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined, color: AppColors.muted),
+                        onPressed: () => setState(() => obscurePassword = !obscurePassword),
+                      ),
+                      hintText: '••••••••',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  const Text('Confirm Password *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.wine)),
+                  const SizedBox(height: 4),
+                  TextField(
+                    controller: confirmPasswordCtrl,
+                    obscureText: obscureConfirmPassword,
+                    decoration: InputDecoration(
+                      prefixIcon: const Icon(Icons.lock_clock_outlined, color: AppColors.wine),
+                      suffixIcon: IconButton(
+                        icon: Icon(obscureConfirmPassword ? Icons.visibility_outlined : Icons.visibility_off_outlined, color: AppColors.muted),
+                        onPressed: () => setState(() => obscureConfirmPassword = !obscureConfirmPassword),
+                      ),
+                      hintText: 'Re-enter password',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    ),
+                  ),
+                  const SizedBox(height: 22),
+
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: ElevatedButton(
+                      onPressed: loading ? null : _handleRegister,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.wine,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      child: loading
+                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                          : const Text('Register Account ✨', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  Center(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text('Already have an account? ', style: TextStyle(color: AppColors.muted, fontSize: 13)),
+                        GestureDetector(
+                          onTap: () => Navigator.pop(context),
+                          child: const Text(
+                            'Sign In',
+                            style: TextStyle(color: AppColors.wine, fontWeight: FontWeight.bold, fontSize: 13, decoration: TextDecoration.underline),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              ),
             ),
           ),
         ),
@@ -209,8 +967,8 @@ class _HomeScreenState extends State<HomeScreen> {
       DashboardPage(onNavigateTab: _navigateToTab),
       const ProductsPage(),
       const AddProductPage(),
-      const AssistantPage(),
       const BuyersPage(),
+      const ProfilePage(),
     ];
 
     return Scaffold(
@@ -222,8 +980,8 @@ class _HomeScreenState extends State<HomeScreen> {
           NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Home'),
           NavigationDestination(icon: Icon(Icons.inventory_2_outlined), selectedIcon: Icon(Icons.inventory_2), label: 'Products'),
           NavigationDestination(icon: Icon(Icons.add_circle_outline), selectedIcon: Icon(Icons.add_circle), label: 'Add Craft'),
-          NavigationDestination(icon: Icon(Icons.smart_toy_outlined), selectedIcon: Icon(Icons.smart_toy), label: 'AI Chatbot'),
           NavigationDestination(icon: Icon(Icons.handshake_outlined), selectedIcon: Icon(Icons.handshake), label: 'Buyers'),
+          NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Profile'),
         ],
       ),
     );
@@ -243,6 +1001,7 @@ class _DashboardPageState extends State<DashboardPage> {
     'total_buyers': 0,
     'ai_opportunity': {'title': 'Handloom demand is high', 'subtitle': 'Add 2 new designs to attract buyers.'}
   };
+  List<dynamic> dueOrders = [];
   bool backendConnected = false;
   bool loading = true;
 
@@ -255,13 +1014,433 @@ class _DashboardPageState extends State<DashboardPage> {
   Future<void> _loadDashboardData() async {
     final connected = await ApiService.checkBackendConnection();
     final data = await ApiService.getDashboardStats();
+    final int? artisanId = currentArtisanSession?['id'] is int
+        ? currentArtisanSession!['id'] as int
+        : int.tryParse(currentArtisanSession?['id']?.toString() ?? '');
+    final String? artisanUsername = currentArtisanSession?['username']?.toString();
+    final orders = await ApiService.getDueOrders(artisanId: artisanId, artisanUsername: artisanUsername);
     if (mounted) {
       setState(() {
         backendConnected = connected;
         stats = data;
+        dueOrders = orders;
         loading = false;
       });
     }
+  }
+
+  void _showProfileModal(BuildContext context) {
+    final artisanName = currentArtisanSession?['name'] ?? 'Guest Artisan';
+    final username = currentArtisanSession?['username'] ?? 'guest';
+    final phone = currentArtisanSession?['phone'] ?? 'N/A';
+    final gender = currentArtisanSession?['gender'] ?? 'N/A';
+    final craftType = currentArtisanSession?['craft_type'] ?? 'Handloom & Handicrafts';
+    final location = currentArtisanSession?['location'] ?? 'India';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (stCtx, setModalState) => Container(
+          padding: const EdgeInsets.all(24),
+          decoration: const BoxDecoration(
+            color: AppColors.cream,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 20),
+                  decoration: BoxDecoration(color: Colors.grey.shade400, borderRadius: BorderRadius.circular(2)),
+                ),
+              ),
+              Row(
+                children: [
+                  buildArtisanAvatar(
+                    radius: 28,
+                    showEditBadge: true,
+                    onTap: () async {
+                      await showProfileAvatarPickerModal(context, onUpdated: () {
+                        setModalState(() {});
+                        setState(() {});
+                      });
+                    },
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          currentArtisanSession?['name'] ?? artisanName,
+                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.wine),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '@${currentArtisanSession?['username'] ?? username}',
+                          style: const TextStyle(color: AppColors.muted, fontSize: 13, fontWeight: FontWeight.w500),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: AppColors.muted),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              const Divider(),
+              const SizedBox(height: 10),
+
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Artisan Profile Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.wine)),
+                  InkWell(
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _showEditProfileModal(context, () {
+                        setState(() {});
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(8),
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit_outlined, size: 16, color: AppColors.wine),
+                          SizedBox(width: 4),
+                          Text('Edit Profile', style: TextStyle(color: AppColors.wine, fontWeight: FontWeight.bold, fontSize: 13)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              _buildProfileRow(Icons.badge_outlined, 'Full Name', currentArtisanSession?['name'] ?? artisanName),
+              _buildProfileRow(Icons.alternate_email, 'Username', '@${currentArtisanSession?['username'] ?? username}'),
+              _buildProfileRow(Icons.phone_outlined, 'Phone', currentArtisanSession?['phone'] ?? phone),
+              _buildProfileRow(Icons.wc_outlined, 'Gender', currentArtisanSession?['gender'] ?? gender),
+              _buildProfileRow(Icons.brush_outlined, 'Craft Specialty', currentArtisanSession?['craft_type'] ?? craftType),
+              _buildProfileRow(Icons.location_on_outlined, 'Location', currentArtisanSession?['location'] ?? location),
+
+              const SizedBox(height: 24),
+
+              // Action Buttons
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        _showEditProfileModal(context, () {
+                          setState(() {});
+                        });
+                      },
+                      icon: const Icon(Icons.edit, size: 18),
+                      label: const Text('Edit Details', style: TextStyle(fontWeight: FontWeight.bold)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.wine,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        setState(() {
+                          currentArtisanSession = null;
+                        });
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Logged out successfully.')),
+                        );
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(builder: (_) => const LoginScreen()),
+                        );
+                      },
+                      icon: const Icon(Icons.logout, color: Colors.red, size: 18),
+                      label: const Text('Logout', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Colors.red, width: 1.5),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showEditProfileModal(BuildContext parentContext, VoidCallback onSaved) {
+    final fullNameCtrl = TextEditingController(text: currentArtisanSession?['name'] ?? '');
+    final phoneCtrl = TextEditingController(text: currentArtisanSession?['phone'] ?? '');
+    final locationCtrl = TextEditingController(text: currentArtisanSession?['location'] ?? '');
+    String currentGender = currentArtisanSession?['gender'] ?? 'Male';
+    String currentCraft = currentArtisanSession?['craft_type'] ?? 'Handloom Weaving & Textiles';
+    bool saving = false;
+
+    final List<String> craftOptions = [
+      'Handloom Weaving & Textiles',
+      'Terracotta Pottery & Bio-Clay',
+      'Bamboo & Cane Craft',
+      'Wood Carving & Handicrafts',
+      'Metal Dokra & Brassware',
+      'Artisanal Footwear & Leather',
+      'Master Weaver & Bamboo Craftsman',
+      'Heritage Crafts & Other',
+    ];
+
+    if (!craftOptions.contains(currentCraft)) {
+      craftOptions.add(currentCraft);
+    }
+
+    showModalBottomSheet(
+      context: parentContext,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (dlgCtx) => StatefulBuilder(
+        builder: (stCtx, setModalState) => Container(
+          padding: EdgeInsets.only(
+            left: 24,
+            right: 24,
+            top: 24,
+            bottom: MediaQuery.of(stCtx).viewInsets.bottom + 24,
+          ),
+          decoration: const BoxDecoration(
+            color: AppColors.cream,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(color: Colors.grey.shade400, borderRadius: BorderRadius.circular(2)),
+                  ),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Edit Artisan Profile ✏️',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.wine),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: AppColors.muted),
+                      onPressed: () => Navigator.pop(dlgCtx),
+                    ),
+                  ],
+                ),
+                const Divider(),
+                const SizedBox(height: 12),
+
+                // Avatar with Camera Icon
+                Center(
+                  child: Column(
+                    children: [
+                      buildArtisanAvatar(
+                        radius: 36,
+                        showEditBadge: true,
+                        onTap: () async {
+                          await showProfileAvatarPickerModal(stCtx, onUpdated: () {
+                            setModalState(() {});
+                            setState(() {});
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 6),
+                      TextButton.icon(
+                        onPressed: () async {
+                          await showProfileAvatarPickerModal(stCtx, onUpdated: () {
+                            setModalState(() {});
+                            setState(() {});
+                          });
+                        },
+                        icon: const Icon(Icons.photo_camera, size: 16, color: AppColors.wine),
+                        label: const Text('Change Profile Picture', style: TextStyle(color: AppColors.wine, fontWeight: FontWeight.bold, fontSize: 12)),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                const Text('Full Name *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.wine)),
+                const SizedBox(height: 4),
+                TextField(
+                  controller: fullNameCtrl,
+                  decoration: InputDecoration(
+                    prefixIcon: const Icon(Icons.person_outline, color: AppColors.wine),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  ),
+                ),
+                const SizedBox(height: 14),
+
+                const Text('Phone Number *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.wine)),
+                const SizedBox(height: 4),
+                TextField(
+                  controller: phoneCtrl,
+                  keyboardType: TextInputType.phone,
+                  decoration: InputDecoration(
+                    prefixIcon: const Icon(Icons.phone_outlined, color: AppColors.wine),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  ),
+                ),
+                const SizedBox(height: 14),
+
+                const Text('Gender *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.wine)),
+                const SizedBox(height: 4),
+                Row(
+                  children: ['Male', 'Female', 'Other'].map((g) {
+                    final sel = currentGender == g;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ChoiceChip(
+                        label: Text(g),
+                        selected: sel,
+                        selectedColor: AppColors.wine.withOpacity(0.15),
+                        onSelected: (val) {
+                          if (val) setModalState(() => currentGender = g);
+                        },
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 14),
+
+                const Text('Craft Specialty / Category *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.wine)),
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: Colors.grey.shade400),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: currentCraft,
+                      isExpanded: true,
+                      icon: const Icon(Icons.arrow_drop_down, color: AppColors.wine),
+                      items: craftOptions.map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 13)))).toList(),
+                      onChanged: (val) {
+                        if (val != null) setModalState(() => currentCraft = val);
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+
+                const Text('Location / Address *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.wine)),
+                const SizedBox(height: 4),
+                TextField(
+                  controller: locationCtrl,
+                  decoration: InputDecoration(
+                    prefixIcon: const Icon(Icons.location_on_outlined, color: AppColors.wine),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  ),
+                ),
+                const SizedBox(height: 22),
+
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: saving ? null : () async {
+                      final username = currentArtisanSession?['username'] ?? '';
+                      if (username.isEmpty) return;
+
+                      setModalState(() => saving = true);
+                      final res = await ApiService.updateArtisanProfile(
+                        username: username,
+                        fullName: fullNameCtrl.text.trim(),
+                        phone: phoneCtrl.text.trim(),
+                        gender: currentGender,
+                        craftType: currentCraft,
+                        location: locationCtrl.text.trim(),
+                      );
+                      setModalState(() => saving = false);
+
+                      if (res != null && res['status'] == 'success' && res['artisan'] != null) {
+                        currentArtisanSession = res['artisan'];
+                      } else {
+                        currentArtisanSession!['name'] = fullNameCtrl.text.trim();
+                        currentArtisanSession!['phone'] = phoneCtrl.text.trim();
+                        currentArtisanSession!['gender'] = currentGender;
+                        currentArtisanSession!['craft_type'] = currentCraft;
+                        currentArtisanSession!['location'] = locationCtrl.text.trim();
+                      }
+
+                      if (dlgCtx.mounted) Navigator.pop(dlgCtx);
+                      onSaved();
+                      if (parentContext.mounted) {
+                        ScaffoldMessenger.of(parentContext).showSnackBar(
+                          const SnackBar(content: Text('Profile details updated successfully! ✨')),
+                        );
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.wine,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    child: saving
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        : const Text('Save Profile Changes', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfileRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: AppColors.wine),
+          const SizedBox(width: 10),
+          SizedBox(
+            width: 110,
+            child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.muted)),
+          ),
+          Expanded(
+            child: Text(value, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Colors.black87)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -272,21 +1451,34 @@ class _DashboardPageState extends State<DashboardPage> {
         padding: const EdgeInsets.all(20),
         children: [
           Row(children: [
-            const CircleAvatar(backgroundColor: AppColors.wine, child: Icon(Icons.person, color: Colors.white)),
+            buildArtisanAvatar(
+              radius: 22,
+              showEditBadge: true,
+              onTap: () => _showProfileModal(context),
+            ),
             const SizedBox(width: 12),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('Namaste, Ramesh!', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-              Row(children: [
-                Container(
-                  width: 8, height: 8,
-                  decoration: BoxDecoration(shape: BoxShape.circle, color: backendConnected ? AppColors.green : Colors.orange),
+            Expanded(
+              child: GestureDetector(
+                onTap: () => _showProfileModal(context),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Namaste, ${(currentArtisanSession?['name'] ?? 'Artisan').split(' ').first}! 🙏',
+                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 6),
-                Text(backendConnected ? 'Backend Connected' : 'Local Mode', style: const TextStyle(fontSize: 12, color: AppColors.muted)),
-              ]),
-            ])),
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.account_circle_outlined, color: AppColors.wine, size: 26),
+              tooltip: 'Profile Details',
+              onPressed: () => _showProfileModal(context),
+            ),
             IconButton(icon: const Icon(Icons.refresh), onPressed: _loadDashboardData),
           ]),
+
           const SizedBox(height: 20),
           Row(children: [
             Expanded(child: QuickAction(
@@ -295,7 +1487,7 @@ class _DashboardPageState extends State<DashboardPage> {
             )),
             const SizedBox(width: 12),
             Expanded(child: QuickAction(
-              icon: Icons.smart_toy_outlined, label: 'Talk to AI\nChatbot', color: const Color(0xFFE6DEFF),
+              icon: Icons.handshake_outlined, label: 'Find\nBuyers', color: const Color(0xFFFFEDC8),
               onTap: () => widget.onNavigateTab?.call(3),
             )),
           ]),
@@ -307,34 +1499,136 @@ class _DashboardPageState extends State<DashboardPage> {
             )),
             const SizedBox(width: 12),
             Expanded(child: QuickAction(
-              icon: Icons.handshake_outlined, label: 'Find\nBuyers', color: const Color(0xFFFFEDC8),
+              icon: Icons.person_outline, label: 'My\nProfile', color: const Color(0xFFE6DEFF),
               onTap: () => widget.onNavigateTab?.call(4),
             )),
           ]),
           const SizedBox(height: 24),
-          const Text("Today's Business Summary", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 12),
-          Row(children: [
-            Expanded(child: MetricCard(value: '${stats['total_products']}', label: 'Products')),
-            const SizedBox(width: 10),
-            Expanded(child: MetricCard(value: '${stats['total_enquiries']}', label: 'Enquiries')),
-            const SizedBox(width: 10),
-            Expanded(child: MetricCard(value: '${stats['total_buyers']}', label: 'Verified Buyers')),
-          ]),
-          const SizedBox(height: 22),
-          const Text('AI Opportunity', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 10),
-          Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            child: ListTile(
-              contentPadding: const EdgeInsets.all(14),
-              leading: const CircleAvatar(backgroundColor: Color(0xFFFFE4B5), child: Icon(Icons.lightbulb_outline, color: AppColors.gold)),
-              title: Text(stats['ai_opportunity']['title'] ?? 'Trending Crafts', style: const TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Text(stats['ai_opportunity']['subtitle'] ?? 'Add designs to get more buyers.'),
-              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-              onTap: () => widget.onNavigateTab?.call(2),
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Orders & Shipments', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.wine)),
+              if (dueOrders.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.green.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${dueOrders.length} Pending Dispatch',
+                    style: const TextStyle(color: AppColors.green, fontWeight: FontWeight.bold, fontSize: 11),
+                  ),
+                ),
+            ],
           ),
+          const SizedBox(height: 12),
+          if (dueOrders.isNotEmpty) ...[
+            ...dueOrders.map((order) {
+              return Card(
+                margin: const EdgeInsets.only(bottom: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: const BorderSide(color: Color(0xFFECE3DD)),
+                ),
+                elevation: 0,
+                color: Colors.white,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.business, color: AppColors.wine, size: 20),
+                              const SizedBox(width: 8),
+                              Text(
+                                order['company_name'] ?? 'B2B Client',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.wine),
+                              ),
+                            ],
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppColors.gold.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              order['status'] ?? 'Due',
+                              style: const TextStyle(color: AppColors.wine, fontWeight: FontWeight.bold, fontSize: 11),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        '${order['quantity_due']} products due to be shipped to ${order['company_name']}',
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.ink),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Item: ${order['product_title']} | Dispatch By: ${order['dispatch_by']}',
+                        style: const TextStyle(fontSize: 12, color: AppColors.muted),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ] else ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF3E4CF),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFFE5D5C1)),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2)),
+                ],
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    height: 220,
+                    width: double.infinity,
+                    clipBehavior: Clip.antiAlias,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF3E4CF),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Image.asset(
+                      'assets/images/artisan_art.jpg',
+                      fit: BoxFit.contain,
+                      errorBuilder: (c, e, s) => Image.network(
+                        ApiService.getFullImageUrl('/uploads/artisan_art.jpg'),
+                        fit: BoxFit.contain,
+                        errorBuilder: (c2, e2, s2) => Container(
+                          color: const Color(0xFFF3E4CF),
+                          child: const Icon(Icons.handyman_outlined, size: 60, color: AppColors.wine),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  const Text(
+                    'You Have No Pending Orders Yet',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.wine),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Once B2B buyers place bulk orders for your handcrafted products, your upcoming shipments will appear here.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 13, color: AppColors.ink, height: 1.35),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     ),
@@ -395,6 +1689,12 @@ class _AddProductPageState extends State<AddProductPage> {
   Map<String, dynamic>? enhancedImageResult;
   Map<String, dynamic>? generatedCatalogResult;
   Map<String, dynamic>? pricingData;
+
+  // PhotoRoom API Background Customizer State
+  String selectedBgStyle = 'white';
+  final TextEditingController customBgPromptCtrl = TextEditingController(
+    text: "natural bamboo mat on sunny studio table"
+  );
 
   // Persistent Controllers across all phases
   final TextEditingController voiceTextController = TextEditingController(
@@ -785,6 +2085,11 @@ class _AddProductPageState extends State<AddProductPage> {
     final wholesale = pricingData?['price_wholesale'] ?? 750;
     final minPrice = pricingData?['min_price'] ?? 550;
 
+    final int? artisanId = currentArtisanSession?['id'] is int
+        ? currentArtisanSession!['id'] as int
+        : int.tryParse(currentArtisanSession?['id']?.toString() ?? '');
+    final String? artisanUsername = currentArtisanSession?['username']?.toString();
+
     final success = await ApiService.publishProduct({
       'title': titleCtrl.text.isNotEmpty ? titleCtrl.text : 'Handcrafted Artisan Product',
       'description_en': descEnCtrl.text,
@@ -800,6 +2105,8 @@ class _AddProductPageState extends State<AddProductPage> {
       'production_days': (laborHours / 8).ceil(),
       'raw_image_url': enhancedImageResult?['raw_image_url'] ?? '',
       'enhanced_image_url': enhancedImageResult?['enhanced_image_url'] ?? '',
+      if (artisanId != null) 'artisan_id': artisanId,
+      if (artisanUsername != null) 'artisan_username': artisanUsername,
     });
 
     if (mounted) {
@@ -812,118 +2119,270 @@ class _AddProductPageState extends State<AddProductPage> {
     }
   }
 
+  static const Map<String, Map<String, String>> _bgStyles = {
+    'white': {'label': 'Clean White', 'icon': '⚪', 'desc': 'Pure studio white background'},
+    'wood': {'label': 'Rustic Wood', 'icon': '🪵', 'desc': 'Warm wooden table setup'},
+    'marble': {'label': 'Luxury Marble', 'icon': '🏛️', 'desc': 'Elegant marble showcase'},
+    'heritage': {'label': 'Heritage Art', 'icon': '🪔', 'desc': 'Traditional Indian craft setting'},
+    'silk': {'label': 'Royal Silk', 'icon': '🧵', 'desc': 'Textured rich silk fabric'},
+    'minimalist': {'label': 'Minimal Beige', 'icon': '🎨', 'desc': 'Neutral aesthetic backdrop'},
+    'custom': {'label': 'Custom AI', 'icon': '✨', 'desc': 'Custom text prompt for PhotoRoom AI'},
+  };
+
   Widget _photoStep() {
     final hasEnhanced = enhancedImageResult != null;
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text('1. AI Image Studio & Enhancer', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-      const SizedBox(height: 6),
-      const Text('Capture your product photo. AI will clean background & apply studio lighting.', style: TextStyle(color: AppColors.muted)),
-      const SizedBox(height: 18),
-      Expanded(
-        child: Container(
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: const Color(0xFFF0ECE9),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFFE2D8D1)),
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('1. AI Image Studio & Enhancer', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 6),
+          const Text(
+            'Powered by PhotoRoom API. Pick an e-commerce background theme and upload your product photo.',
+            style: TextStyle(color: AppColors.muted),
           ),
-          child: hasEnhanced
-              ? Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                children: [
-                                  const Text('Original Photo', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                                  const SizedBox(height: 6),
-                                  Expanded(
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(12),
-                                      child: Image.memory(selectedImageBytes!, fit: BoxFit.cover),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                children: [
-                                  const Text('AI Studio Enhanced ✨', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.wine)),
-                                  const SizedBox(height: 6),
-                                  Expanded(
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(12),
-                                      child: Image.network(
-                                        ApiService.getFullImageUrl(enhancedImageResult!['enhanced_image_url']),
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (c, e, s) => Container(color: Colors.white, child: const Icon(Icons.auto_awesome, color: AppColors.gold, size: 40)),
+          const SizedBox(height: 14),
+
+          const Text('Select PhotoRoom Studio Background:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.wine)),
+          const SizedBox(height: 8),
+
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _bgStyles.entries.map((entry) {
+              final key = entry.key;
+              final info = entry.value;
+              final isSelected = selectedBgStyle == key;
+              return ChoiceChip(
+                label: Text('${info['icon']} ${info['label']}'),
+                selected: isSelected,
+                selectedColor: AppColors.wine,
+                backgroundColor: Colors.white,
+                labelStyle: TextStyle(
+                  color: isSelected ? Colors.white : AppColors.wine,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                  fontSize: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  side: BorderSide(color: isSelected ? AppColors.wine : const Color(0xFFE2D8D1)),
+                ),
+                onSelected: (bool selected) {
+                  if (selected) {
+                    setState(() {
+                      selectedBgStyle = key;
+                    });
+                    if (selectedImageBytes != null) {
+                      _reEnhanceWithPhotoRoom();
+                    }
+                  }
+                },
+              );
+            }).toList(),
+          ),
+
+          if (selectedBgStyle == 'custom') ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: customBgPromptCtrl,
+                    decoration: InputDecoration(
+                      hintText: 'e.g. natural bamboo mat on sunny studio table',
+                      labelText: 'Custom PhotoRoom Background Prompt',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton.icon(
+                  onPressed: selectedImageBytes != null ? _reEnhanceWithPhotoRoom : null,
+                  icon: const Icon(Icons.auto_awesome, size: 16),
+                  label: const Text('Generate'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.wine,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ],
+            ),
+          ],
+
+          const SizedBox(height: 16),
+
+          Container(
+            width: double.infinity,
+            height: 380,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0ECE9),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFFE2D8D1)),
+            ),
+            child: hasEnhanced
+                ? Column(
+                    children: [
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  children: [
+                                    const Text('Original Photo', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                    const SizedBox(height: 6),
+                                    Expanded(
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(12),
+                                        child: Image.memory(selectedImageBytes!, fit: BoxFit.cover, width: double.infinity),
                                       ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        const Text('PhotoRoom Studio ✨', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.wine)),
+                                        if (processing) ...[
+                                          const SizedBox(width: 6),
+                                          const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.wine)),
+                                        ],
+                                      ],
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Expanded(
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(12),
+                                        child: Image.network(
+                                          ApiService.getFullImageUrl(enhancedImageResult!['enhanced_image_url']),
+                                          fit: BoxFit.cover,
+                                          width: double.infinity,
+                                          errorBuilder: (c, e, s) => Container(
+                                            color: Colors.white,
+                                            child: const Center(child: Icon(Icons.auto_awesome, color: AppColors.gold, size: 40)),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.only(bottomLeft: Radius.circular(20), bottomRight: Radius.circular(20)),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.check_circle, color: AppColors.green, size: 18),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Theme: ${_bgStyles[selectedBgStyle]?['label'] ?? 'Studio'}',
+                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                                ),
+                              ],
+                            ),
+                            Row(
+                              children: [
+                                TextButton.icon(
+                                  onPressed: () => _pickAndEnhanceImage(ImageSource.gallery),
+                                  icon: const Icon(Icons.refresh, size: 16, color: AppColors.wine),
+                                  label: const Text('Change Photo', style: TextStyle(fontSize: 12, color: AppColors.wine)),
+                                ),
+                                const SizedBox(width: 4),
+                                ElevatedButton.icon(
+                                  onPressed: _reEnhanceWithPhotoRoom,
+                                  icon: const Icon(Icons.auto_awesome, size: 14),
+                                  label: const Text('Re-Enhance', style: TextStyle(fontSize: 12)),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.wine,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
                       ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      color: Colors.white,
-                      child: Row(
-                        children: const [
-                          Icon(Icons.check_circle, color: AppColors.green, size: 18),
-                          SizedBox(width: 8),
-                          Text('Studio background & lighting applied', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                    ],
+                  )
+                : Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const CircleAvatar(radius: 36, backgroundColor: AppColors.wine, child: Icon(Icons.camera_alt_outlined, size: 34, color: Colors.white)),
+                      const SizedBox(height: 16),
+                      const Text('Tap to capture or choose photo', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      const SizedBox(height: 6),
+                      const Text('PhotoRoom API will isolate product and generate AI background', style: TextStyle(color: AppColors.muted, fontSize: 12)),
+                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          ElevatedButton.icon(
+                            onPressed: () => _pickAndEnhanceImage(ImageSource.camera),
+                            icon: const Icon(Icons.camera),
+                            label: const Text('Camera'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.cream,
+                              foregroundColor: AppColors.wine,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          ElevatedButton.icon(
+                            onPressed: () => _pickAndEnhanceImage(ImageSource.gallery),
+                            icon: const Icon(Icons.photo_library),
+                            label: const Text('Gallery'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.cream,
+                              foregroundColor: AppColors.wine,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          ),
                         ],
                       ),
-                    ),
-                  ],
-                )
-              : Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const CircleAvatar(radius: 36, backgroundColor: AppColors.wine, child: Icon(Icons.camera_alt_outlined, size: 34, color: Colors.white)),
-                    const SizedBox(height: 16),
-                    const Text('Tap to capture or choose photo', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                    const SizedBox(height: 12),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        ElevatedButton.icon(
-                          onPressed: () => _pickAndEnhanceImage(ImageSource.camera),
-                          icon: const Icon(Icons.camera),
-                          label: const Text('Camera'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.cream,
-                            foregroundColor: AppColors.wine,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        ElevatedButton.icon(
-                          onPressed: () => _pickAndEnhanceImage(ImageSource.gallery),
-                          icon: const Icon(Icons.photo_library),
-                          label: const Text('Gallery'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.cream,
-                            foregroundColor: AppColors.wine,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-        ),
+                    ],
+                  ),
+          ),
+        ],
       ),
-    ]);
+    );
+  }
+
+  Future<void> _reEnhanceWithPhotoRoom() async {
+    if (selectedImageBytes == null) return;
+    setState(() => processing = true);
+    final result = await ApiService.enhanceImage(
+      selectedImageBytes!,
+      originalFileName ?? 'product.jpg',
+      bgStyle: selectedBgStyle,
+      bgPrompt: customBgPromptCtrl.text,
+    );
+    if (mounted) {
+      setState(() {
+        enhancedImageResult = result;
+        processing = false;
+      });
+    }
   }
 
   Future<void> _pickAndEnhanceImage(ImageSource source) async {
@@ -937,11 +2396,18 @@ class _AddProductPageState extends State<AddProductPage> {
           originalFileName = picked.name;
           processing = true;
         });
-        final result = await ApiService.enhanceImage(bytes, picked.name);
-        setState(() {
-          enhancedImageResult = result;
-          processing = false;
-        });
+        final result = await ApiService.enhanceImage(
+          bytes,
+          picked.name,
+          bgStyle: selectedBgStyle,
+          bgPrompt: customBgPromptCtrl.text,
+        );
+        if (mounted) {
+          setState(() {
+            enhancedImageResult = result;
+            processing = false;
+          });
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -1419,7 +2885,15 @@ class _ProductsPageState extends State<ProductsPage> {
   }
 
   Future<void> _loadProducts() async {
-    final list = await ApiService.getProducts();
+    final int? artisanId = currentArtisanSession?['id'] is int
+        ? currentArtisanSession!['id'] as int
+        : int.tryParse(currentArtisanSession?['id']?.toString() ?? '');
+    final String? artisanUsername = currentArtisanSession?['username']?.toString();
+
+    final list = await ApiService.getProducts(
+      artisanId: artisanId,
+      artisanUsername: artisanUsername,
+    );
     if (mounted) {
       setState(() {
         products = list;
@@ -1746,6 +3220,387 @@ class _ProductsPageState extends State<ProductsPage> {
       ),
     ]),
   );
+}
+
+class ProfilePage extends StatefulWidget {
+  const ProfilePage({super.key});
+  @override State<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
+  Widget _buildProfileRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFECE3DD)),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: AppColors.wine),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: const TextStyle(fontSize: 11, color: AppColors.muted, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 2),
+                  Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.ink)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showEditProfileModal() {
+    final fullNameCtrl = TextEditingController(text: currentArtisanSession?['name'] ?? '');
+    final phoneCtrl = TextEditingController(text: currentArtisanSession?['phone'] ?? '');
+    final locationCtrl = TextEditingController(text: currentArtisanSession?['location'] ?? '');
+    String currentGender = currentArtisanSession?['gender'] ?? 'Male';
+    String currentCraft = currentArtisanSession?['craft_type'] ?? 'Handloom Weaving & Textiles';
+    bool saving = false;
+
+    final List<String> craftOptions = [
+      'Handloom Weaving & Textiles',
+      'Terracotta Pottery & Bio-Clay',
+      'Bamboo & Cane Craft',
+      'Wood Carving & Handicrafts',
+      'Metal Dokra & Brassware',
+      'Heritage Painting & Folk Art',
+      'Jewelry & Beaded Craft',
+      'Leather & General Craftsmanship',
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (modalCtx) => StatefulBuilder(
+        builder: (stCtx, setModalState) => Container(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(modalCtx).viewInsets.bottom + 20,
+            top: 20, left: 20, right: 20,
+          ),
+          decoration: const BoxDecoration(
+            color: AppColors.cream,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40, height: 4, margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(color: Colors.grey.shade400, borderRadius: BorderRadius.circular(2)),
+                  ),
+                ),
+                const Row(
+                  children: [
+                    Icon(Icons.edit_note_rounded, color: AppColors.wine, size: 28),
+                    SizedBox(width: 8),
+                    Text('Edit Artisan Profile', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.wine)),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                Center(
+                  child: buildArtisanAvatar(
+                    radius: 36,
+                    showEditBadge: true,
+                    onTap: () async {
+                      await showProfileAvatarPickerModal(context, onUpdated: () {
+                        setModalState(() {});
+                        setState(() {});
+                      });
+                    },
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Center(
+                  child: Text('Tap photo to change profile picture', style: TextStyle(fontSize: 12, color: AppColors.muted)),
+                ),
+                const SizedBox(height: 16),
+
+                const Text('Full Name', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.muted)),
+                const SizedBox(height: 4),
+                TextField(
+                  controller: fullNameCtrl,
+                  decoration: InputDecoration(
+                    hintText: 'Enter your full name',
+                    fillColor: Colors.white, filled: true,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                const Text('Phone Number', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.muted)),
+                const SizedBox(height: 4),
+                TextField(
+                  controller: phoneCtrl,
+                  keyboardType: TextInputType.phone,
+                  decoration: InputDecoration(
+                    hintText: 'Enter phone number',
+                    fillColor: Colors.white, filled: true,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                const Text('Gender', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.muted)),
+                const SizedBox(height: 6),
+                Row(
+                  children: ['Male', 'Female', 'Other'].map((g) {
+                    final isSel = currentGender == g;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ChoiceChip(
+                        label: Text(g),
+                        selected: isSel,
+                        selectedColor: AppColors.wine,
+                        labelStyle: TextStyle(color: isSel ? Colors.white : AppColors.wine, fontWeight: FontWeight.bold),
+                        onSelected: (sel) {
+                          if (sel) setModalState(() => currentGender = g);
+                        },
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 12),
+
+                const Text('Craft Specialty', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.muted)),
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white, borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade400),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      isExpanded: true,
+                      value: craftOptions.contains(currentCraft) ? currentCraft : craftOptions.first,
+                      items: craftOptions.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                      onChanged: (val) {
+                        if (val != null) setModalState(() => currentCraft = val);
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                const Text('Location / Address', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.muted)),
+                const SizedBox(height: 4),
+                TextField(
+                  controller: locationCtrl,
+                  decoration: InputDecoration(
+                    hintText: 'e.g. Varanasi, Uttar Pradesh',
+                    fillColor: Colors.white, filled: true,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: saving ? null : () async {
+                      setModalState(() => saving = true);
+                      final username = currentArtisanSession?['username'] ?? '';
+                      final res = await ApiService.updateArtisanProfile(
+                        username: username,
+                        fullName: fullNameCtrl.text.trim(),
+                        phone: phoneCtrl.text.trim(),
+                        gender: currentGender,
+                        craftType: currentCraft,
+                        location: locationCtrl.text.trim(),
+                        profilePicture: currentArtisanSession?['profile_picture'],
+                      );
+                      if (modalCtx.mounted) {
+                        setModalState(() => saving = false);
+                        Navigator.pop(modalCtx);
+                        if (res != null && res['status'] == 'success') {
+                          setState(() {
+                            currentArtisanSession = res['artisan'];
+                            currentArtisanSession!['name'] = fullNameCtrl.text.trim();
+                            currentArtisanSession!['phone'] = phoneCtrl.text.trim();
+                            currentArtisanSession!['gender'] = currentGender;
+                            currentArtisanSession!['craft_type'] = currentCraft;
+                            currentArtisanSession!['location'] = locationCtrl.text.trim();
+                          });
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Profile details updated successfully! ✨'), backgroundColor: AppColors.green),
+                          );
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(res?['message'] ?? 'Failed to update profile.')),
+                          );
+                        }
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.wine,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    child: saving
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        : const Text('Save Profile Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final artisanName = currentArtisanSession?['name'] ?? 'Guest Artisan';
+    final username = currentArtisanSession?['username'] ?? 'guest';
+    final phone = currentArtisanSession?['phone'] ?? 'N/A';
+    final gender = currentArtisanSession?['gender'] ?? 'N/A';
+    final craftType = currentArtisanSession?['craft_type'] ?? 'Handloom & Handicrafts';
+    final location = currentArtisanSession?['location'] ?? 'India';
+
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('My Profile', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.wine)),
+                IconButton(
+                  icon: const Icon(Icons.edit_outlined, color: AppColors.wine),
+                  tooltip: 'Edit Profile',
+                  onPressed: _showEditProfileModal,
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4)),
+                ],
+              ),
+              child: Row(
+                children: [
+                  buildArtisanAvatar(
+                    radius: 34,
+                    showEditBadge: true,
+                    onTap: () async {
+                      await showProfileAvatarPickerModal(context, onUpdated: () {
+                        setState(() {});
+                      });
+                    },
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          artisanName,
+                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.wine),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '@$username',
+                          style: const TextStyle(color: AppColors.muted, fontSize: 13, fontWeight: FontWeight.w500),
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.green.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Text('Verified Artisan', style: TextStyle(fontSize: 11, color: AppColors.green, fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            const Text('Personal & Craft Information', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.wine)),
+            const SizedBox(height: 12),
+
+            _buildProfileRow(Icons.badge_outlined, 'Full Name', artisanName),
+            _buildProfileRow(Icons.alternate_email, 'Username', '@$username'),
+            _buildProfileRow(Icons.phone_outlined, 'Phone', phone),
+            _buildProfileRow(Icons.wc_outlined, 'Gender', gender),
+            _buildProfileRow(Icons.brush_outlined, 'Craft Specialty', craftType),
+            _buildProfileRow(Icons.location_on_outlined, 'Location', location),
+
+            const SizedBox(height: 24),
+
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _showEditProfileModal,
+                    icon: const Icon(Icons.edit, size: 18),
+                    label: const Text('Edit Details', style: TextStyle(fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.wine,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        currentArtisanSession = null;
+                      });
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Logged out successfully.')),
+                      );
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(builder: (_) => const LoginScreen()),
+                      );
+                    },
+                    icon: const Icon(Icons.logout, color: Colors.red, size: 18),
+                    label: const Text('Logout', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Colors.red, width: 1.5),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class AssistantPage extends StatefulWidget {

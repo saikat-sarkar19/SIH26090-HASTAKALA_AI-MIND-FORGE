@@ -8,7 +8,12 @@ import json
 import os
 
 from hastakala_backend.config import UPLOAD_DIR, ENHANCED_DIR, AUDIO_DIR, HOST, PORT
-from hastakala_backend.database import init_db, get_db_connection
+from hastakala_backend.database import (
+    init_db, get_db_info, connect_mongodb,
+    db_get_dashboard_stats, db_get_all_products, db_get_product_by_id,
+    db_create_product, db_delete_product, db_register_artisan, db_login_artisan, db_update_artisan_profile,
+    db_get_due_orders
+)
 from hastakala_backend.services.image_service import enhance_product_image
 from hastakala_backend.services.catalog_service import generate_catalog_from_voice_or_text, translate_regional_text
 from hastakala_backend.services.pricing_service import calculate_dynamic_pricing
@@ -71,10 +76,37 @@ class ProductCreate(BaseModel):
     production_days: Optional[int] = 2
     raw_image_url: Optional[str] = ""
     enhanced_image_url: Optional[str] = ""
+    artisan_id: Optional[int] = None
+    artisan_username: Optional[str] = None
 
 class AssistantRequest(BaseModel):
     query: str
     language: Optional[str] = "Hindi"
+
+class MongoConnectRequest(BaseModel):
+    mongodb_uri: str
+
+class RegisterRequest(BaseModel):
+    full_name: str
+    username: str
+    phone: str
+    gender: Optional[str] = "Male"
+    craft_type: Optional[str] = "Handloom & Handicrafts"
+    address: str
+    password: str
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+class ProfileUpdateRequest(BaseModel):
+    username: str
+    full_name: Optional[str] = None
+    phone: Optional[str] = None
+    gender: Optional[str] = None
+    craft_type: Optional[str] = None
+    location: Optional[str] = None
+    profile_picture: Optional[str] = None
 
 
 # --- Routes ---
@@ -84,28 +116,59 @@ def root():
     return {
         "status": "online",
         "app": "Hastakala AI Business Manager Backend",
+        "database": get_db_info(),
         "version": "1.0.0",
         "documentation": "/docs"
     }
 
+@app.post("/api/auth/register")
+def register_artisan_endpoint(req: RegisterRequest):
+    try:
+        artisan = db_register_artisan(req.model_dump())
+        return {"status": "success", "artisan": artisan, "message": "Account created successfully!"}
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
+
+@app.post("/api/auth/login")
+def login_artisan_endpoint(req: LoginRequest):
+    artisan = db_login_artisan(req.username, req.password)
+    if not artisan:
+        raise HTTPException(status_code=401, detail="Invalid username or password. Please check your credentials.")
+    return {"status": "success", "artisan": artisan, "message": "Login successful!"}
+
+@app.post("/api/auth/update_profile")
+def update_artisan_profile_endpoint(req: ProfileUpdateRequest):
+    try:
+        updated_artisan = db_update_artisan_profile(req.model_dump())
+        return {"status": "success", "artisan": updated_artisan, "message": "Profile updated successfully!"}
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update profile: {str(e)}")
+
+@app.get("/api/database/status")
+def database_status():
+    return get_db_info()
+
+@app.post("/api/database/connect")
+def connect_database(req: MongoConnectRequest):
+    try:
+        connect_mongodb(req.mongodb_uri)
+        info = get_db_info()
+        return {"status": "success", "message": "Successfully connected to MongoDB", "info": info}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to connect to MongoDB: {str(e)}")
+
 @app.get("/api/dashboard/stats")
 def get_dashboard_stats():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT COUNT(*) as total_products FROM products")
-    total_products = cursor.fetchone()["total_products"]
-
-    cursor.execute("SELECT COUNT(*) as total_enquiries FROM enquiries")
-    total_enquiries = cursor.fetchone()["total_enquiries"]
-
-    cursor.execute("SELECT COUNT(*) as total_buyers FROM buyers")
-    total_buyers = cursor.fetchone()["total_buyers"]
-    conn.close()
-
+    stats = db_get_dashboard_stats()
     return {
-        "total_products": total_products,
-        "total_enquiries": total_enquiries,
-        "total_buyers": total_buyers,
+        "total_products": stats["total_products"],
+        "total_enquiries": stats["total_enquiries"],
+        "total_buyers": stats["total_buyers"],
+        "db_type": get_db_info()["db_type"],
         "ai_opportunity": {
             "title": "Your handloom products are trending",
             "subtitle": "Add 2 more designs this week to attract more GeM & Shilp Samagam buyers.",
@@ -114,11 +177,15 @@ def get_dashboard_stats():
     }
 
 @app.post("/api/image/enhance")
-async def enhance_image_endpoint(file: UploadFile = File(...)):
+async def enhance_image_endpoint(
+    file: UploadFile = File(...),
+    bg_style: Optional[str] = Form("white"),
+    bg_prompt: Optional[str] = Form("")
+):
     if not file:
         raise HTTPException(status_code=400, detail="No file uploaded")
     contents = await file.read()
-    result = enhance_product_image(contents, file.filename)
+    result = enhance_product_image(contents, file.filename, bg_style=bg_style or "white", custom_bg_prompt=bg_prompt or "")
     return result
 
 @app.post("/api/translate")
@@ -157,54 +224,29 @@ def calculate_pricing_endpoint(req: PricingRequest):
     return result
 
 @app.get("/api/products")
-def get_products():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM products ORDER BY id DESC")
-    rows = cursor.fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
+def get_products(
+    artisan_id: Optional[int] = Query(None),
+    artisan_username: Optional[str] = Query(None)
+):
+    return db_get_all_products(artisan_id=artisan_id, artisan_username=artisan_username)
 
 @app.post("/api/products")
 def create_product(product: ProductCreate):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    now_str = datetime.now().isoformat()
-    cursor.execute("""
-    INSERT INTO products (artisan_id, title, description_en, description_hi, category, materials, tags, price_retail, price_wholesale, min_price, material_cost, labor_cost, production_days, raw_image_url, enhanced_image_url, status, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
-        1, product.title, product.description_en, product.description_hi,
-        product.category, product.materials, product.tags,
-        product.price_retail, product.price_wholesale, product.min_price,
-        product.material_cost, product.labor_cost, product.production_days or 2,
-        product.raw_image_url or "", product.enhanced_image_url or "",
-        "Published", now_str
-    ))
-    conn.commit()
-    new_id = cursor.lastrowid
-    conn.close()
-
+    new_id = db_create_product(product.model_dump())
     return {"status": "success", "id": new_id, "message": "Product published successfully"}
 
 @app.get("/api/products/{product_id}")
 def get_product_detail(product_id: int):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM products WHERE id = ?", (product_id,))
-    row = cursor.fetchone()
-    conn.close()
-    if not row:
+    prod = db_get_product_by_id(product_id)
+    if not prod:
         raise HTTPException(status_code=404, detail="Product not found")
-    return dict(row)
+    return prod
 
 @app.delete("/api/products/{product_id}")
 def delete_product(product_id: int):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM products WHERE id = ?", (product_id,))
-    conn.commit()
-    conn.close()
+    success = db_delete_product(product_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Product not found or delete failed")
     return {"status": "success", "message": "Product deleted"}
 
 @app.post("/api/assistant/chat")
@@ -219,6 +261,14 @@ def list_buyers(category: Optional[str] = Query(None)):
 def list_enquiries(product_id: Optional[int] = Query(None)):
     return get_product_enquiries(product_id=product_id)
 
+@app.get("/api/orders")
+def get_due_orders(
+    artisan_id: Optional[int] = Query(None),
+    artisan_username: Optional[str] = Query(None)
+):
+    return db_get_due_orders(artisan_id=artisan_id, artisan_username=artisan_username)
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("hastakala_backend.main:app", host=HOST, port=PORT, reload=True)
+
