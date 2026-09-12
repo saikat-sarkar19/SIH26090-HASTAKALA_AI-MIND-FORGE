@@ -121,7 +121,7 @@ class SplashScreen extends StatelessWidget {
               icon: Icons.arrow_forward,
               onPressed: () => Navigator.pushReplacement(
                 context,
-                MaterialPageRoute(builder: (_) => const LanguageScreen()),
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
               ),
             ),
           ],
@@ -129,59 +129,6 @@ class SplashScreen extends StatelessWidget {
       ),
     ),
   );
-}
-
-class LanguageScreen extends StatefulWidget {
-  const LanguageScreen({super.key});
-  @override State<LanguageScreen> createState() => _LanguageScreenState();
-}
-
-class _LanguageScreenState extends State<LanguageScreen> {
-  int selectedIndex = 0;
-  final languages = ['English', 'हिंदी (Hindi)', 'বাংলা (Bengali)', 'ગુજરાતી (Gujarati)', 'தமிழ் (Tamil)', 'मराठी (Marathi)'];
-
-  @override
-  Widget build(BuildContext context) {
-    return PageShell(
-      title: '',
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          children: [
-            logo(width: 130),
-            const SizedBox(height: 24),
-            const Text('Choose Your Language', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            const Text('Select the language you are comfortable speaking', style: TextStyle(color: AppColors.muted)),
-            const SizedBox(height: 24),
-            Expanded(
-              child: ListView.separated(
-                itemCount: languages.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 10),
-                itemBuilder: (_, i) => OutlinedButton(
-                  onPressed: () => setState(() => selectedIndex = i),
-                  style: OutlinedButton.styleFrom(
-                    alignment: Alignment.centerLeft,
-                    minimumSize: const Size.fromHeight(54),
-                    side: BorderSide(color: selectedIndex == i ? AppColors.wine : const Color(0xFFE4D9D3), width: selectedIndex == i ? 2 : 1),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  ),
-                  child: Row(children: [
-                    Expanded(child: Text(languages[i], style: TextStyle(fontSize: 16, fontWeight: selectedIndex == i ? FontWeight.bold : FontWeight.normal))),
-                    if (selectedIndex == i) const Icon(Icons.check_circle, color: AppColors.wine),
-                  ]),
-                ),
-              ),
-            ),
-            AppButton(
-              text: 'Continue',
-              onPressed: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen())),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 class LoginScreen extends StatelessWidget {
@@ -249,33 +196,42 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int index = 0;
 
-  final pages = const [
-    DashboardPage(),
-    ProductsPage(),
-    AddProductPage(),
-    AssistantPage(),
-    BuyersPage(),
-  ];
+  void _navigateToTab(int tabIndex) {
+    setState(() {
+      index = tabIndex;
+    });
+  }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    body: pages[index],
-    bottomNavigationBar: NavigationBar(
-      selectedIndex: index,
-      onDestinationSelected: (v) => setState(() => index = v),
-      destinations: const [
-        NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Home'),
-        NavigationDestination(icon: Icon(Icons.inventory_2_outlined), selectedIcon: Icon(Icons.inventory_2), label: 'Products'),
-        NavigationDestination(icon: Icon(Icons.add_circle_outline), selectedIcon: Icon(Icons.add_circle), label: 'Add Craft'),
-        NavigationDestination(icon: Icon(Icons.auto_awesome_outlined), selectedIcon: Icon(Icons.auto_awesome), label: 'AI Assistant'),
-        NavigationDestination(icon: Icon(Icons.handshake_outlined), selectedIcon: Icon(Icons.handshake), label: 'Buyers'),
-      ],
-    ),
-  );
+  Widget build(BuildContext context) {
+    final pages = [
+      DashboardPage(onNavigateTab: _navigateToTab),
+      const ProductsPage(),
+      const AddProductPage(),
+      const AssistantPage(),
+      const BuyersPage(),
+    ];
+
+    return Scaffold(
+      body: pages[index],
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: index,
+        onDestinationSelected: (v) => setState(() => index = v),
+        destinations: const [
+          NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Home'),
+          NavigationDestination(icon: Icon(Icons.inventory_2_outlined), selectedIcon: Icon(Icons.inventory_2), label: 'Products'),
+          NavigationDestination(icon: Icon(Icons.add_circle_outline), selectedIcon: Icon(Icons.add_circle), label: 'Add Craft'),
+          NavigationDestination(icon: Icon(Icons.smart_toy_outlined), selectedIcon: Icon(Icons.smart_toy), label: 'AI Chatbot'),
+          NavigationDestination(icon: Icon(Icons.handshake_outlined), selectedIcon: Icon(Icons.handshake), label: 'Buyers'),
+        ],
+      ),
+    );
+  }
 }
 
 class DashboardPage extends StatefulWidget {
-  const DashboardPage({super.key});
+  final ValueChanged<int>? onNavigateTab;
+  const DashboardPage({super.key, this.onNavigateTab});
   @override State<DashboardPage> createState() => _DashboardPageState();
 }
 
@@ -334,24 +290,24 @@ class _DashboardPageState extends State<DashboardPage> {
           Row(children: [
             Expanded(child: QuickAction(
               icon: Icons.camera_alt_outlined, label: 'Add New\nProduct', color: const Color(0xFFFFD9D4),
-              onTap: () {},
+              onTap: () => widget.onNavigateTab?.call(2),
             )),
             const SizedBox(width: 12),
             Expanded(child: QuickAction(
-              icon: Icons.mic_none, label: 'Talk to AI\nAssistant', color: const Color(0xFFE6DEFF),
-              onTap: () {},
+              icon: Icons.smart_toy_outlined, label: 'Talk to AI\nChatbot', color: const Color(0xFFE6DEFF),
+              onTap: () => widget.onNavigateTab?.call(3),
             )),
           ]),
           const SizedBox(height: 12),
           Row(children: [
             Expanded(child: QuickAction(
               icon: Icons.inventory_2_outlined, label: 'My\nProducts', color: const Color(0xFFD9F0E3),
-              onTap: () {},
+              onTap: () => widget.onNavigateTab?.call(1),
             )),
             const SizedBox(width: 12),
             Expanded(child: QuickAction(
               icon: Icons.handshake_outlined, label: 'Find\nBuyers', color: const Color(0xFFFFEDC8),
-              onTap: () {},
+              onTap: () => widget.onNavigateTab?.call(4),
             )),
           ]),
           const SizedBox(height: 24),
@@ -375,6 +331,7 @@ class _DashboardPageState extends State<DashboardPage> {
               title: Text(stats['ai_opportunity']['title'] ?? 'Trending Crafts', style: const TextStyle(fontWeight: FontWeight.bold)),
               subtitle: Text(stats['ai_opportunity']['subtitle'] ?? 'Add designs to get more buyers.'),
               trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+              onTap: () => widget.onNavigateTab?.call(2),
             ),
           ),
         ],
@@ -427,6 +384,11 @@ class _AddProductPageState extends State<AddProductPage> {
   bool isListening = false;
   bool calculatingPricing = false;
 
+  String selectedLanguage = 'Auto-Detect';
+  String detectedLanguage = 'Hindi (हिंदी)';
+  String translatedEnglishText = 'Handwoven Banarasi Cotton Saree with authentic Zari embroidery motifs';
+  bool isTranslating = false;
+
   Uint8List? selectedImageBytes;
   String? originalFileName;
   Map<String, dynamic>? enhancedImageResult;
@@ -454,6 +416,29 @@ class _AddProductPageState extends State<AddProductPage> {
   void initState() {
     super.initState();
     _fetchPricing();
+    _translateCurrentText();
+  }
+
+  Future<void> _translateCurrentText() async {
+    final text = voiceTextController.text.trim();
+    if (text.isEmpty) {
+      setState(() {
+        detectedLanguage = '';
+        translatedEnglishText = '';
+      });
+      return;
+    }
+    setState(() => isTranslating = true);
+    final res = await ApiService.translateText(text);
+    if (mounted && res != null) {
+      setState(() {
+        detectedLanguage = res['detected_language'] ?? '';
+        translatedEnglishText = res['translated_text'] ?? '';
+        isTranslating = false;
+      });
+    } else {
+      if (mounted) setState(() => isTranslating = false);
+    }
   }
 
   Future<void> _fetchPricing() async {
@@ -862,12 +847,52 @@ class _AddProductPageState extends State<AddProductPage> {
       child: Column(children: [
         const Text('2. Multilingual Voice Cataloger', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
         const SizedBox(height: 6),
-        const Text('Speak into your microphone or type details in your regional language.', textAlign: TextAlign.center, style: TextStyle(color: AppColors.muted)),
-        const SizedBox(height: 18),
+        const Text('Speak into your microphone or type details in any regional language.', textAlign: TextAlign.center, style: TextStyle(color: AppColors.muted)),
+        const SizedBox(height: 16),
         
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text('Speech Language:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.wine)),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE2D8D1)),
+              ),
+              child: DropdownButton<String>(
+                value: selectedLanguage,
+                underline: Container(),
+                icon: const Icon(Icons.arrow_drop_down, color: AppColors.wine),
+                items: const [
+                  DropdownMenuItem(value: 'Auto-Detect', child: Text('🌐 Auto-Detect (Any Language)')),
+                  DropdownMenuItem(value: 'hi-IN', child: Text('🇮🇳 Hindi (हिंदी)')),
+                  DropdownMenuItem(value: 'en-US', child: Text('🇺🇸 English')),
+                  DropdownMenuItem(value: 'bn-IN', child: Text('🇮🇳 Bengali (বাংলা)')),
+                  DropdownMenuItem(value: 'gu-IN', child: Text('🇮🇳 Gujarati (ગુજરાતી)')),
+                  DropdownMenuItem(value: 'mr-IN', child: Text('🇮🇳 Marathi (मराठी)')),
+                  DropdownMenuItem(value: 'ta-IN', child: Text('🇮🇳 Tamil (தமிழ்)')),
+                  DropdownMenuItem(value: 'te-IN', child: Text('🇮🇳 Telugu (తెలుగు)')),
+                  DropdownMenuItem(value: 'kn-IN', child: Text('🇮🇳 Kannada (ಕನ್ನಡ)')),
+                  DropdownMenuItem(value: 'ml-IN', child: Text('🇮🇳 Malayalam (മലയാളം)')),
+                  DropdownMenuItem(value: 'pa-IN', child: Text('🇮🇳 Punjabi (ਪੰਜਾਬੀ)')),
+                ],
+                onChanged: (val) {
+                  if (val != null) {
+                    setState(() => selectedLanguage = val);
+                  }
+                },
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
         TextField(
           controller: voiceTextController,
           maxLines: 3,
+          onChanged: (_) => _translateCurrentText(),
           decoration: InputDecoration(
             labelText: 'Spoken Description / Transcript',
             hintText: 'Speak using mic or type e.g. यह सूती धागे से बनी हाथ से बुनी साड़ी है...',
@@ -880,6 +905,61 @@ class _AddProductPageState extends State<AddProductPage> {
             ),
           ),
         ),
+
+        if (voiceTextController.text.trim().isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2D8D1)),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8, offset: const Offset(0, 2))
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.translate, size: 18, color: AppColors.wine),
+                        const SizedBox(width: 6),
+                        Text(
+                          detectedLanguage.isNotEmpty ? 'Detected: $detectedLanguage' : 'Google Translate Auto-Detecting...',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.wine),
+                        ),
+                      ],
+                    ),
+                    if (isTranslating)
+                      const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.wine))
+                    else
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(color: const Color(0xFFE8F5E9), borderRadius: BorderRadius.circular(10)),
+                        child: const Text('Google Translate API', style: TextStyle(fontSize: 10, color: AppColors.green, fontWeight: FontWeight.bold)),
+                      ),
+                  ],
+                ),
+                const Divider(height: 16),
+                const Text('Original Regional Text:', style: TextStyle(fontSize: 11, color: AppColors.muted, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 2),
+                Text(voiceTextController.text, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                if (translatedEnglishText.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  const Text('English Translation (Google Translate):', style: TextStyle(fontSize: 11, color: AppColors.green, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 2),
+                  Text(translatedEnglishText, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.wine)),
+                ],
+              ],
+            ),
+          ),
+        ],
+
         const SizedBox(height: 16),
 
         GestureDetector(
@@ -903,7 +983,7 @@ class _AddProductPageState extends State<AddProductPage> {
         ),
         const SizedBox(height: 10),
         Text(
-          isListening ? '🔴 Listening to your Microphone... Speak now!' : 'Tap Microphone to Speak (Uses Live Web Speech)',
+          isListening ? '🔴 Listening to your Microphone... Speak in any language!' : 'Tap Microphone to Speak (Uses Live Web Speech)',
           style: TextStyle(fontWeight: FontWeight.bold, color: isListening ? Colors.red : AppColors.wine, fontSize: 13),
         ),
         if (isListening) ...[
@@ -936,6 +1016,7 @@ class _AddProductPageState extends State<AddProductPage> {
               setState(() {
                 voiceTextController.text = v['text']!;
               });
+              _translateCurrentText();
               ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                 content: Text('Loaded ${v['lang']} voice sample!'),
                 duration: const Duration(seconds: 1),
@@ -953,13 +1034,15 @@ class _AddProductPageState extends State<AddProductPage> {
       setState(() => isListening = false);
     } else {
       setState(() => isListening = true);
+      final langCode = selectedLanguage == 'Auto-Detect' ? 'hi-IN' : selectedLanguage;
       final success = SpeechService.startListening(
-        languageCode: 'hi-IN',
+        languageCode: langCode,
         onResult: (text) {
           if (mounted) {
             setState(() {
               voiceTextController.text = text;
             });
+            _translateCurrentText();
           }
         },
         onEnd: () {
@@ -1302,25 +1385,84 @@ class AssistantPage extends StatefulWidget {
 
 class _AssistantPageState extends State<AssistantPage> {
   final List<Map<String, String>> messages = [
-    {'text': 'Namaste Ramesh! 👋 How can I help with your handicraft business today?', 'sender': 'ai'}
+    {
+      'text': 'Namaste Ramesh! 🙏 I am your Hastakala AI Chatbot. Ask me anything about craft pricing, finding bulk B2B buyers, trending designs, or government artisan schemes!',
+      'sender': 'ai'
+    }
   ];
   final TextEditingController inputCtrl = TextEditingController();
+  final ScrollController scrollCtrl = ScrollController();
   bool typing = false;
+  bool isListening = false;
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (scrollCtrl.hasClients) {
+        scrollCtrl.animateTo(
+          scrollCtrl.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
 
   void sendMessage(String query) async {
     if (query.trim().isEmpty) return;
+    final text = query.trim();
     setState(() {
-      messages.add({'text': query, 'sender': 'user'});
+      messages.add({'text': text, 'sender': 'user'});
       typing = true;
     });
     inputCtrl.clear();
+    _scrollToBottom();
 
-    final res = await ApiService.chatAssistant(query);
+    final res = await ApiService.chatAssistant(text);
     if (mounted) {
       setState(() {
         typing = false;
-        messages.add({'text': res?['reply'] ?? 'I am here to assist your artisan business.', 'sender': 'ai'});
+        messages.add({
+          'text': res?['reply'] ?? 'Namaste! I am here to help your artisan business grow.',
+          'sender': 'ai'
+        });
       });
+      _scrollToBottom();
+    }
+  }
+
+  void _toggleMic() {
+    if (isListening) {
+      SpeechService.stopListening();
+      setState(() => isListening = false);
+    } else {
+      setState(() => isListening = true);
+      final success = SpeechService.startListening(
+        languageCode: 'hi-IN',
+        onResult: (resultText) {
+          if (mounted) {
+            setState(() {
+              inputCtrl.text = resultText;
+            });
+          }
+        },
+        onEnd: () {
+          if (mounted) {
+            setState(() => isListening = false);
+          }
+        },
+        onError: (err) {
+          if (mounted) {
+            setState(() => isListening = false);
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text('Mic Error: $err'),
+              backgroundColor: Colors.red,
+            ));
+          }
+        },
+      );
+      if (!success) {
+        setState(() => isListening = false);
+      }
     }
   }
 
@@ -1329,58 +1471,156 @@ class _AssistantPageState extends State<AssistantPage> {
     child: Padding(
       padding: const EdgeInsets.all(16),
       child: Column(children: [
-        const Align(alignment: Alignment.centerLeft, child: Text('AI Business Assistant', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold))),
-        const SizedBox(height: 12),
+        Row(
+          children: [
+            const CircleAvatar(
+              backgroundColor: AppColors.wine,
+              radius: 20,
+              child: Icon(Icons.smart_toy, color: AppColors.gold, size: 22),
+            ),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('AI Chatbot Assistant', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                Row(children: [
+                  Container(
+                    width: 8, height: 8,
+                    decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.green),
+                  ),
+                  const SizedBox(width: 6),
+                  const Text('Online • Hastakala Intelligence', style: TextStyle(fontSize: 12, color: AppColors.muted)),
+                ]),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
         Expanded(
           child: ListView.separated(
+            controller: scrollCtrl,
             itemCount: messages.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 10),
+            separatorBuilder: (_, __) => const SizedBox(height: 12),
             itemBuilder: (_, i) {
               final m = messages[i];
               final isAi = m['sender'] == 'ai';
-              return Align(
-                alignment: isAi ? Alignment.centerLeft : Alignment.centerRight,
-                child: Container(
-                  padding: const EdgeInsets.all(14),
-                  constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.8),
-                  decoration: BoxDecoration(
-                    color: isAi ? Colors.white : AppColors.wine,
-                    borderRadius: BorderRadius.circular(16),
+              return Row(
+                mainAxisAlignment: isAi ? MainAxisAlignment.start : MainAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (isAi) ...[
+                    const CircleAvatar(
+                      radius: 16,
+                      backgroundColor: AppColors.wine,
+                      child: Icon(Icons.smart_toy, size: 16, color: Colors.white),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  Flexible(
+                    child: Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: isAi ? Colors.white : AppColors.wine,
+                        borderRadius: BorderRadius.only(
+                          topLeft: const Radius.circular(16),
+                          topRight: const Radius.circular(16),
+                          bottomLeft: Radius.circular(isAi ? 4 : 16),
+                          bottomRight: Radius.circular(isAi ? 16 : 4),
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.04),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Text(
+                        m['text']!,
+                        style: TextStyle(
+                          color: isAi ? AppColors.ink : Colors.white,
+                          fontSize: 14,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
                   ),
-                  child: Text(
-                    m['text']!,
-                    style: TextStyle(color: isAi ? AppColors.ink : Colors.white),
-                  ),
-                ),
+                  if (!isAi) ...[
+                    const SizedBox(width: 8),
+                    const CircleAvatar(
+                      radius: 16,
+                      backgroundColor: AppColors.gold,
+                      child: Icon(Icons.person, size: 16, color: Colors.white),
+                    ),
+                  ],
+                ],
               );
             },
           ),
         ),
-        if (typing) const LinearProgressIndicator(color: AppColors.gold),
-        const SizedBox(height: 8),
-        Wrap(spacing: 6, runSpacing: 6, children: [
-          _suggestionChip('How much should I sell this for?'),
-          _suggestionChip('Find buyers for handloom'),
-          _suggestionChip('PM Vishwakarma Scheme'),
-        ]),
-        const SizedBox(height: 8),
-        TextField(
-          controller: inputCtrl,
-          decoration: InputDecoration(
-            hintText: 'Ask your AI assistant...',
-            suffixIcon: IconButton(icon: const Icon(Icons.send, color: AppColors.wine), onPressed: () => sendMessage(inputCtrl.text)),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(18)),
-            filled: true,
-            fillColor: Colors.white,
-          ),
-          onSubmitted: sendMessage,
+        if (typing) ...[
+          const SizedBox(height: 8),
+          Row(children: const [
+            SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.wine)),
+            SizedBox(width: 10),
+            Text('AI Chatbot is typing answer...', style: TextStyle(fontSize: 12, color: AppColors.muted, fontStyle: FontStyle.italic)),
+          ]),
+        ],
+        const SizedBox(height: 10),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(children: [
+            _suggestionChip('How much should I sell saree for?'),
+            const SizedBox(width: 6),
+            _suggestionChip('Find verified buyers for handloom'),
+            const SizedBox(width: 6),
+            _suggestionChip('PM Vishwakarma Loan Scheme'),
+            const SizedBox(width: 6),
+            _suggestionChip('Which crafts are trending this week?'),
+          ]),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: inputCtrl,
+                decoration: InputDecoration(
+                  hintText: isListening ? 'Listening... Speak into mic' : 'Ask AI Chatbot...',
+                  hintStyle: TextStyle(color: isListening ? Colors.red : AppColors.muted),
+                  prefixIcon: IconButton(
+                    icon: Icon(isListening ? Icons.mic : Icons.mic_none, color: isListening ? Colors.red : AppColors.wine),
+                    onPressed: _toggleMic,
+                    tooltip: 'Speak query via mic',
+                  ),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: const BorderSide(color: Color(0xFFE2D8D1))),
+                  filled: true,
+                  fillColor: Colors.white,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                ),
+                onSubmitted: sendMessage,
+              ),
+            ),
+            const SizedBox(width: 8),
+            CircleAvatar(
+              radius: 24,
+              backgroundColor: AppColors.wine,
+              child: IconButton(
+                icon: const Icon(Icons.send, color: Colors.white, size: 20),
+                onPressed: () => sendMessage(inputCtrl.text),
+              ),
+            ),
+          ],
         ),
       ]),
     ),
   );
 
   Widget _suggestionChip(String text) => ActionChip(
-    label: Text(text, style: const TextStyle(fontSize: 11)),
+    avatar: const Icon(Icons.lightbulb_outline, size: 14, color: AppColors.wine),
+    label: Text(text, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+    backgroundColor: Colors.white,
+    side: const BorderSide(color: Color(0xFFE2D8D1)),
     onPressed: () => sendMessage(text),
   );
 }

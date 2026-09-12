@@ -62,8 +62,25 @@ class ApiService {
     return null;
   }
 
+  // Regional Translation & Language Auto-Detection API
+  static Future<Map<String, dynamic>?> translateText(String text) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/api/translate'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'text': text}),
+      );
+      if (res.statusCode == 200) {
+        return jsonDecode(res.body);
+      }
+    } catch (e) {
+      debugPrint('Error translating text: $e');
+    }
+    return null;
+  }
+
   // Multilingual Voice/Text Cataloger API
-  static Future<Map<String, dynamic>?> generateCatalog(String voiceText, {String language = 'Hindi'}) async {
+  static Future<Map<String, dynamic>?> generateCatalog(String voiceText, {String language = 'Auto-Detect'}) async {
     try {
       final res = await http.post(
         Uri.parse('$baseUrl/api/catalog/generate'),

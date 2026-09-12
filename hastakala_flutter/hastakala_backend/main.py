@@ -10,7 +10,7 @@ import os
 from hastakala_backend.config import UPLOAD_DIR, ENHANCED_DIR, AUDIO_DIR, HOST, PORT
 from hastakala_backend.database import init_db, get_db_connection
 from hastakala_backend.services.image_service import enhance_product_image
-from hastakala_backend.services.catalog_service import generate_catalog_from_voice_or_text
+from hastakala_backend.services.catalog_service import generate_catalog_from_voice_or_text, translate_regional_text
 from hastakala_backend.services.pricing_service import calculate_dynamic_pricing
 from hastakala_backend.services.assistant_service import chat_with_assistant
 from hastakala_backend.services.buyer_service import get_verified_buyers, get_product_enquiries
@@ -40,7 +40,10 @@ app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 # --- Models ---
 class CatalogRequest(BaseModel):
     voice_text: Optional[str] = ""
-    language: Optional[str] = "Hindi"
+    language: Optional[str] = "Auto-Detect"
+
+class TranslateRequest(BaseModel):
+    text: str
 
 class PricingRequest(BaseModel):
     category: str
@@ -114,6 +117,10 @@ async def enhance_image_endpoint(file: UploadFile = File(...)):
     contents = await file.read()
     result = enhance_product_image(contents, file.filename)
     return result
+
+@app.post("/api/translate")
+def translate_endpoint(req: TranslateRequest):
+    return translate_regional_text(req.text)
 
 @app.post("/api/catalog/generate")
 def generate_catalog_endpoint(req: CatalogRequest):
