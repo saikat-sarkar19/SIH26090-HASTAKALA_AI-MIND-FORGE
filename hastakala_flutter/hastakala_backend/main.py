@@ -41,9 +41,12 @@ app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 class CatalogRequest(BaseModel):
     voice_text: Optional[str] = ""
     language: Optional[str] = "Auto-Detect"
+    image_url: Optional[str] = ""
 
 class TranslateRequest(BaseModel):
     text: str
+    source_lang: Optional[str] = "auto"
+    target_lang: Optional[str] = "en"
 
 class PricingRequest(BaseModel):
     category: str
@@ -120,13 +123,14 @@ async def enhance_image_endpoint(file: UploadFile = File(...)):
 
 @app.post("/api/translate")
 def translate_endpoint(req: TranslateRequest):
-    return translate_regional_text(req.text)
+    return translate_regional_text(req.text, source_lang=req.source_lang or "auto", target_lang=req.target_lang or "en")
 
 @app.post("/api/catalog/generate")
 def generate_catalog_endpoint(req: CatalogRequest):
     result = generate_catalog_from_voice_or_text(
         voice_text=req.voice_text,
-        language=req.language
+        language=req.language,
+        image_url=req.image_url or ""
     )
     return result
 

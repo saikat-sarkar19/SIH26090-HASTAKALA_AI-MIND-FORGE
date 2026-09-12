@@ -63,12 +63,16 @@ class ApiService {
   }
 
   // Regional Translation & Language Auto-Detection API
-  static Future<Map<String, dynamic>?> translateText(String text) async {
+  static Future<Map<String, dynamic>?> translateText(String text, {String sourceLang = 'auto', String targetLang = 'en'}) async {
     try {
       final res = await http.post(
         Uri.parse('$baseUrl/api/translate'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'text': text}),
+        body: jsonEncode({
+          'text': text,
+          'source_lang': sourceLang,
+          'target_lang': targetLang,
+        }),
       );
       if (res.statusCode == 200) {
         return jsonDecode(res.body);
@@ -79,13 +83,13 @@ class ApiService {
     return null;
   }
 
-  // Multilingual Voice/Text Cataloger API
-  static Future<Map<String, dynamic>?> generateCatalog(String voiceText, {String language = 'Auto-Detect'}) async {
+  // Multilingual & Multimodal Voice/Text Cataloger API
+  static Future<Map<String, dynamic>?> generateCatalog(String voiceText, {String language = 'Auto-Detect', String imageUrl = ''}) async {
     try {
       final res = await http.post(
         Uri.parse('$baseUrl/api/catalog/generate'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'voice_text': voiceText, 'language': language}),
+        body: jsonEncode({'voice_text': voiceText, 'language': language, 'image_url': imageUrl}),
       );
       if (res.statusCode == 200) {
         return jsonDecode(res.body);
@@ -166,6 +170,17 @@ class ApiService {
       return res.statusCode == 200;
     } catch (e) {
       debugPrint('Error publishing product: $e');
+      return false;
+    }
+  }
+
+  // Delete Product
+  static Future<bool> deleteProduct(int productId) async {
+    try {
+      final res = await http.delete(Uri.parse('$baseUrl/api/products/$productId'));
+      return res.statusCode == 200;
+    } catch (e) {
+      debugPrint('Error deleting product: $e');
       return false;
     }
   }

@@ -12,7 +12,7 @@ AUDIO_DIR.mkdir(parents=True, exist_ok=True)
 
 DB_PATH = BASE_DIR / "hastakala.db"
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "AQ.Ab8RN6J0v_F3-B0NhVwDk_CxI23rrU36ZIqRfCDx1cdCYHel1Q")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "AQ.Ab8RN6JceOZYN62DyoZidXBQfWNY8dSHbZ_jLHOBN5Wfzkuj0w")
 
 HOST = "0.0.0.0"
 PORT = 8000

@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
@@ -412,6 +413,117 @@ class _AddProductPageState extends State<AddProductPage> {
   double laborHours = 12.0;
   double laborRate = 100.0;
 
+  Timer? _enTranslationDebounce;
+  Timer? _regionalTranslationDebounce;
+  bool _isTranslatingField = false;
+
+  static const Map<String, Map<String, String>> _langInfoMap = {
+    'hi': {'name': 'Hindi (हिंदी)', 'code': 'hi', 'label': 'Hindi Description (हिंदी विवरण)'},
+    'hi-in': {'name': 'Hindi (हिंदी)', 'code': 'hi', 'label': 'Hindi Description (हिंदी विवरण)'},
+    'hindi': {'name': 'Hindi (हिंदी)', 'code': 'hi', 'label': 'Hindi Description (हिंदी विवरण)'},
+    'bn': {'name': 'Bengali (বাংলা)', 'code': 'bn', 'label': 'Bengali Description (বাংলা विवरण)'},
+    'bn-in': {'name': 'Bengali (বাংলা)', 'code': 'bn', 'label': 'Bengali Description (বাংলা विवरण)'},
+    'bengali': {'name': 'Bengali (বাংলা)', 'code': 'bn', 'label': 'Bengali Description (বাংলা विवरण)'},
+    'gu': {'name': 'Gujarati (ગુજરાતી)', 'code': 'gu', 'label': 'Gujarati Description (ગુજરાતી વિવરણ)'},
+    'gu-in': {'name': 'Gujarati (ગુજરાતી)', 'code': 'gu', 'label': 'Gujarati Description (ગુજરાતી વિવરણ)'},
+    'gujarati': {'name': 'Gujarati (ગુજરાતી)', 'code': 'gu', 'label': 'Gujarati Description (ગુજરાતી વિવરણ)'},
+    'mr': {'name': 'Marathi (मराठी)', 'code': 'mr', 'label': 'Marathi Description (मराठी विवरण)'},
+    'mr-in': {'name': 'Marathi (मराठी)', 'code': 'mr', 'label': 'Marathi Description (मराठी विवरण)'},
+    'marathi': {'name': 'Marathi (मराठी)', 'code': 'mr', 'label': 'Marathi Description (मराठी विवरण)'},
+    'ta': {'name': 'Tamil (தமிழ்)', 'code': 'ta', 'label': 'Tamil Description (தமிழ் விவரம்)'},
+    'ta-in': {'name': 'Tamil (தமிழ்)', 'code': 'ta', 'label': 'Tamil Description (தமிழ் விவரம்)'},
+    'tamil': {'name': 'Tamil (தமிழ்)', 'code': 'ta', 'label': 'Tamil Description (தமிழ் விவரம்)'},
+    'te': {'name': 'Telugu (తెలుగు)', 'code': 'te', 'label': 'Telugu Description (తెలుగు వివరణ)'},
+    'te-in': {'name': 'Telugu (తెలుగు)', 'code': 'te', 'label': 'Telugu Description (తెలుగు వివరణ)'},
+    'telugu': {'name': 'Telugu (తెలుగు)', 'code': 'te', 'label': 'Telugu Description (తెలుగు వివరణ)'},
+    'kn': {'name': 'Kannada (ಕನ್ನಡ)', 'code': 'kn', 'label': 'Kannada Description (ಕನ್ನಡ ವಿವರಣೆ)'},
+    'kn-in': {'name': 'Kannada (ಕನ್ನಡ)', 'code': 'kn', 'label': 'Kannada Description (ಕನ್ನಡ ವಿವರಣೆ)'},
+    'kannada': {'name': 'Kannada (ಕನ್ನಡ)', 'code': 'kn', 'label': 'Kannada Description (ಕನ್ನಡ ವಿವರಣೆ)'},
+    'ml': {'name': 'Malayalam (മലയാളം)', 'code': 'ml', 'label': 'Malayalam Description (മലയാളം വിവരണം)'},
+    'ml-in': {'name': 'Malayalam (മലയാളം)', 'code': 'ml', 'label': 'Malayalam Description (മലയാളം വിവരണം)'},
+    'malayalam': {'name': 'Malayalam (മലയാളം)', 'code': 'ml', 'label': 'Malayalam Description (മലയാളം വിവരണം)'},
+    'pa': {'name': 'Punjabi (ਪੰਜਾਬੀ)', 'code': 'pa', 'label': 'Punjabi Description (ਪੰਜਾਬੀ ਵੇਰਵਾ)'},
+    'pa-in': {'name': 'Punjabi (ਪੰਜਾਬੀ)', 'code': 'pa', 'label': 'Punjabi Description (ਪੰਜਾਬੀ ਵੇਰਵਾ)'},
+    'punjabi': {'name': 'Punjabi (ਪੰਜਾਬੀ)', 'code': 'pa', 'label': 'Punjabi Description (ਪੰਜਾਬੀ ਵੇਰਵਾ)'},
+  };
+
+  Map<String, String> _getActiveLanguageDetails() {
+    String searchStr = '';
+    if (selectedLanguage != 'Auto-Detect') {
+      searchStr = selectedLanguage.toLowerCase().trim();
+    } else if (detectedLanguage.isNotEmpty) {
+      searchStr = detectedLanguage.toLowerCase().trim();
+    }
+
+    if (searchStr.isNotEmpty) {
+      for (final entry in _langInfoMap.entries) {
+        if (searchStr.contains(entry.key)) {
+          return entry.value;
+        }
+      }
+    }
+    return const {'name': 'Hindi (हिंदी)', 'code': 'hi', 'label': 'Hindi Description (हिंदी विवरण)'};
+  }
+
+  Future<void> _translateEnToRegional() async {
+    if (_isTranslatingField) return;
+    final text = descEnCtrl.text.trim();
+    if (text.isEmpty) return;
+
+    final langDetails = _getActiveLanguageDetails();
+    final targetCode = langDetails['code'] ?? 'hi';
+
+    setState(() => _isTranslatingField = true);
+    final res = await ApiService.translateText(text, sourceLang: 'en', targetLang: targetCode);
+    if (mounted) {
+      if (res != null && res['translated_text'] != null && res['translated_text'].toString().isNotEmpty) {
+        descHiCtrl.text = res['translated_text'];
+      }
+      setState(() => _isTranslatingField = false);
+    }
+  }
+
+  Future<void> _translateRegionalToEn() async {
+    if (_isTranslatingField) return;
+    final text = descHiCtrl.text.trim();
+    if (text.isEmpty) return;
+
+    final langDetails = _getActiveLanguageDetails();
+    final sourceCode = langDetails['code'] ?? 'auto';
+
+    setState(() => _isTranslatingField = true);
+    final res = await ApiService.translateText(text, sourceLang: sourceCode, targetLang: 'en');
+    if (mounted) {
+      if (res != null && res['translated_text'] != null && res['translated_text'].toString().isNotEmpty) {
+        descEnCtrl.text = res['translated_text'];
+      }
+      setState(() => _isTranslatingField = false);
+    }
+  }
+
+  void _onEnChanged(String val) {
+    if (_isTranslatingField) return;
+    _enTranslationDebounce?.cancel();
+    _enTranslationDebounce = Timer(const Duration(milliseconds: 1000), () {
+      _translateEnToRegional();
+    });
+  }
+
+  void _onRegionalChanged(String val) {
+    if (_isTranslatingField) return;
+    _regionalTranslationDebounce?.cancel();
+    _regionalTranslationDebounce = Timer(const Duration(milliseconds: 1000), () {
+      _translateRegionalToEn();
+    });
+  }
+
+  @override
+  void dispose() {
+    _enTranslationDebounce?.cancel();
+    _regionalTranslationDebounce?.cancel();
+    super.dispose();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -465,8 +577,9 @@ class _AddProductPageState extends State<AddProductPage> {
     if (catalog['description_en'] != null && catalog['description_en'].toString().isNotEmpty) {
       descEnCtrl.text = catalog['description_en'];
     }
-    if (catalog['description_hi'] != null && catalog['description_hi'].toString().isNotEmpty) {
-      descHiCtrl.text = catalog['description_hi'];
+    final regDesc = catalog['description_regional'] ?? catalog['description_hi'];
+    if (regDesc != null && regDesc.toString().isNotEmpty) {
+      descHiCtrl.text = regDesc.toString();
     }
     if (catalog['category'] != null && catalog['category'].toString().isNotEmpty) {
       catCtrl.text = catalog['category'];
@@ -641,7 +754,12 @@ class _AddProductPageState extends State<AddProductPage> {
       // If voice text provided and catalog not generated yet, generate catalog automatically
       if (voiceTextController.text.trim().isNotEmpty && generatedCatalogResult == null) {
         setState(() => processing = true);
-        final catalog = await ApiService.generateCatalog(voiceTextController.text);
+        final imgUrl = enhancedImageResult?['enhanced_image_url'] ?? enhancedImageResult?['raw_image_url'] ?? '';
+        final catalog = await ApiService.generateCatalog(
+          voiceTextController.text,
+          language: selectedLanguage,
+          imageUrl: imgUrl,
+        );
         if (catalog != null) {
           _syncCatalogToControllers(catalog);
           generatedCatalogResult = catalog;
@@ -866,7 +984,7 @@ class _AddProductPageState extends State<AddProductPage> {
                 underline: Container(),
                 icon: const Icon(Icons.arrow_drop_down, color: AppColors.wine),
                 items: const [
-                  DropdownMenuItem(value: 'Auto-Detect', child: Text('🌐 Auto-Detect (Any Language)')),
+                  DropdownMenuItem(value: 'Auto-Detect', child: Text('🌐 Choose your language')),
                   DropdownMenuItem(value: 'hi-IN', child: Text('🇮🇳 Hindi (हिंदी)')),
                   DropdownMenuItem(value: 'en-US', child: Text('🇺🇸 English')),
                   DropdownMenuItem(value: 'bn-IN', child: Text('🇮🇳 Bengali (বাংলা)')),
@@ -1122,8 +1240,7 @@ class _AddProductPageState extends State<AddProductPage> {
             ),
           const SizedBox(height: 16),
           _editableField('Product Name', titleCtrl),
-          _editableField('English Description (SEO)', descEnCtrl, maxLines: 3),
-          _editableField('Hindi Description (हिंदी विवरण)', descHiCtrl, maxLines: 3),
+          _editableField('English Description (SEO)', descEnCtrl, maxLines: 4),
           _editableField('Category', catCtrl),
           _editableField('Materials', matCtrl),
           _editableField('Tags', tagsCtrl),
@@ -1311,6 +1428,233 @@ class _ProductsPageState extends State<ProductsPage> {
     }
   }
 
+  void _showProductDetailModal(BuildContext parentCtx, Map<String, dynamic> p) {
+    showModalBottomSheet(
+      context: parentCtx,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (modalCtx) => DraggableScrollableSheet(
+        initialChildSize: 0.85,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (_, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: AppColors.cream,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.all(20),
+          child: ListView(
+            controller: scrollController,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: AppColors.muted.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              if ((p['enhanced_image_url'] ?? p['raw_image_url'] ?? '').toString().isNotEmpty)
+                Container(
+                  height: 220,
+                  clipBehavior: Clip.antiAlias,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: AppColors.gold, width: 1.5),
+                  ),
+                  child: Image.network(
+                    ApiService.getFullImageUrl(p['enhanced_image_url'] ?? p['raw_image_url']),
+                    fit: BoxFit.cover,
+                    errorBuilder: (c, e, s) => Container(
+                      color: const Color(0xFFE9DED3),
+                      child: const Icon(Icons.image_outlined, size: 60, color: AppColors.wine),
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 16),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      p['title'] ?? 'Product Details',
+                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.green.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.check_circle, color: AppColors.green, size: 14),
+                        const SizedBox(width: 4),
+                        Text(
+                          p['status'] ?? 'Published',
+                          style: const TextStyle(color: AppColors.green, fontWeight: FontWeight.bold, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFECE3DD)),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Retail Price (D2C)', style: TextStyle(fontSize: 11, color: AppColors.muted)),
+                              const SizedBox(height: 2),
+                              Text('₹${p['price_retail']?.toInt() ?? 0}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.wine)),
+                            ],
+                          ),
+                        ),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Wholesale (B2B)', style: TextStyle(fontSize: 11, color: AppColors.muted)),
+                              const SizedBox(height: 2),
+                              Text('₹${p['price_wholesale']?.toInt() ?? 0}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.ink)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Divider(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Fair Price Floor:', style: TextStyle(fontSize: 12, color: AppColors.muted, fontWeight: FontWeight.bold)),
+                        Text('₹${p['min_price']?.toInt() ?? 0}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.green)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              _detailRow('Category', p['category'] ?? 'N/A', Icons.category_outlined),
+              _detailRow('Materials', p['materials'] ?? 'N/A', Icons.inventory_2_outlined),
+              _detailRow('Tags', p['tags'] ?? 'N/A', Icons.local_offer_outlined),
+              _detailRow('Description', p['description_en'] ?? 'N/A', Icons.description_outlined, isLongText: true),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton.icon(
+                  onPressed: () => _confirmDeleteProduct(parentCtx, modalCtx, p),
+                  icon: const Icon(Icons.delete_outline, color: Colors.white),
+                  label: const Text('Delete Product', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 15)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red.shade700,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _detailRow(String label, String value, IconData icon, {bool isLongText = false}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFECE3DD)),
+        ),
+        child: Row(
+          crossAxisAlignment: isLongText ? CrossAxisAlignment.start : CrossAxisAlignment.center,
+          children: [
+            Icon(icon, size: 20, color: AppColors.wine),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: const TextStyle(fontSize: 11, color: AppColors.muted, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 3),
+                  Text(value, style: const TextStyle(fontSize: 13, color: AppColors.ink, height: 1.3)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _confirmDeleteProduct(BuildContext parentCtx, BuildContext? modalCtx, Map<String, dynamic> p) {
+    showDialog(
+      context: modalCtx ?? parentCtx,
+      builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.red),
+            SizedBox(width: 8),
+            Text('Delete Product?'),
+          ],
+        ),
+        content: Text('Are you sure you want to delete "${p['title']}"? This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              Navigator.pop(dialogCtx);
+              if (modalCtx != null) {
+                Navigator.pop(modalCtx);
+              }
+              if (p['id'] != null) {
+                final success = await ApiService.deleteProduct(p['id']);
+                if (mounted) {
+                  if (success) {
+                    ScaffoldMessenger.of(parentCtx).showSnackBar(
+                      SnackBar(content: Text('"${p['title']}" deleted successfully.'), backgroundColor: Colors.red),
+                    );
+                    _loadProducts();
+                  } else {
+                    ScaffoldMessenger.of(parentCtx).showSnackBar(
+                      const SnackBar(content: Text('Failed to delete product.')),
+                    );
+                  }
+                }
+              }
+            },
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) => SafeArea(
     child: Column(children: [
@@ -1340,35 +1684,61 @@ class _ProductsPageState extends State<ProductsPage> {
                         return Card(
                           clipBehavior: Clip.antiAlias,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            Expanded(
-                              child: Container(
-                                color: const Color(0xFFE9DED3),
-                                width: double.infinity,
-                                child: imgUrl.isNotEmpty
-                                    ? Image.network(
-                                        ApiService.getFullImageUrl(imgUrl),
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (c, e, s) => const Icon(Icons.image_outlined, size: 48, color: AppColors.wine),
-                                      )
-                                    : const Icon(Icons.image_outlined, size: 48, color: AppColors.wine),
-                              ),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.all(10),
-                              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                Text(p['title'] ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                const SizedBox(height: 4),
-                                Text('₹${p['price_retail']?.toInt() ?? 0}', style: const TextStyle(color: AppColors.wine, fontWeight: FontWeight.bold, fontSize: 16)),
-                                const SizedBox(height: 4),
-                                Row(children: [
-                                  const Icon(Icons.check_circle, color: AppColors.green, size: 12),
-                                  const SizedBox(width: 4),
-                                  Text(p['status'] ?? 'Published', style: const TextStyle(color: AppColors.green, fontSize: 11)),
+                          child: InkWell(
+                            onTap: () => _showProductDetailModal(context, p),
+                            child: Stack(
+                              children: [
+                                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                  Expanded(
+                                    child: Container(
+                                      color: const Color(0xFFE9DED3),
+                                      width: double.infinity,
+                                      child: imgUrl.isNotEmpty
+                                          ? Image.network(
+                                              ApiService.getFullImageUrl(imgUrl),
+                                              fit: BoxFit.cover,
+                                              errorBuilder: (c, e, s) => const Icon(Icons.image_outlined, size: 48, color: AppColors.wine),
+                                            )
+                                          : const Icon(Icons.image_outlined, size: 48, color: AppColors.wine),
+                                    ),
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.all(10),
+                                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                      Text(p['title'] ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                      const SizedBox(height: 4),
+                                      Text('₹${p['price_retail']?.toInt() ?? 0}', style: const TextStyle(color: AppColors.wine, fontWeight: FontWeight.bold, fontSize: 16)),
+                                      const SizedBox(height: 4),
+                                      Row(children: [
+                                        const Icon(Icons.check_circle, color: AppColors.green, size: 12),
+                                        const SizedBox(width: 4),
+                                        Text(p['status'] ?? 'Published', style: const TextStyle(color: AppColors.green, fontSize: 11)),
+                                      ]),
+                                    ]),
+                                  ),
                                 ]),
-                              ]),
+                                Positioned(
+                                  top: 6,
+                                  right: 6,
+                                  child: InkWell(
+                                    onTap: () => _confirmDeleteProduct(context, null, p),
+                                    borderRadius: BorderRadius.circular(20),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.9),
+                                        shape: BoxShape.circle,
+                                        boxShadow: [
+                                          BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4),
+                                        ],
+                                      ),
+                                      child: const Icon(Icons.delete_outline, color: Colors.red, size: 18),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                          ]),
+                          ),
                         );
                       },
                     ),
