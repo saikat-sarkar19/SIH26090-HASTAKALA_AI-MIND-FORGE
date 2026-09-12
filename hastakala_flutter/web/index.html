@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base href="$FLUTTER_BASE_HREF">
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="Hastakala - AI-Powered Business Manager for Artisans">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="Hastakala">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>Hastakala</title>
+  <link rel="manifest" href="manifest.json">
+
+  <!-- Web Speech Recognition & Audio Bridge -->
+  <script>
+    window.HastakalaSpeech = {
+      recognition: null,
+      isListening: false,
+
+      startListening: function(langCode) {
+        var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+          alert("Web Speech Recognition is not supported in this browser. Please use Google Chrome or Microsoft Edge.");
+          return false;
+        }
+
+        try {
+          if (this.recognition) {
+            try { this.recognition.stop(); } catch(e) {}
+          }
+          this.recognition = new SpeechRecognition();
+          this.recognition.continuous = true;
+          this.recognition.interimResults = true;
+          this.recognition.lang = langCode || 'hi-IN';
+
+          this.recognition.onresult = function(event) {
+            var finalTranscript = '';
+            for (var i = event.resultIndex; i < event.results.length; ++i) {
+              finalTranscript += event.results[i][0].transcript;
+            }
+            if (finalTranscript && window.onHastakalaSpeechResult) {
+              window.onHastakalaSpeechResult(finalTranscript);
+            }
+          };
+
+          this.recognition.onerror = function(event) {
+            console.warn("Speech recognition error:", event.error);
+            if (window.onHastakalaSpeechError) {
+              window.onHastakalaSpeechError(event.error);
+            }
+          };
+
+          this.recognition.onend = function() {
+            window.HastakalaSpeech.isListening = false;
+            if (window.onHastakalaSpeechEnd) {
+              window.onHastakalaSpeechEnd();
+            }
+          };
+
+          this.recognition.start();
+          this.isListening = true;
+          return true;
+        } catch (err) {
+          console.error("Failed to start speech recognition:", err);
+          return false;
+        }
+      },
+
+      stopListening: function() {
+        if (this.recognition) {
+          try {
+            this.recognition.stop();
+          } catch(e) {}
+          this.isListening = false;
+        }
+      }
+    };
+  </script>
+</head>
+<body>
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>
