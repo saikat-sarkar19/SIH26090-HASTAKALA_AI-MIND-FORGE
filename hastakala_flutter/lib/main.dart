@@ -6,6 +6,10 @@ import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:hastakala/services/api_service.dart';
 import 'package:hastakala/services/speech_service.dart';
+import 'package:hastakala/screens/buyer_home_screen.dart';
+import 'package:hastakala/screens/buyer_auth_page.dart';
+import 'package:hastakala/screens/artisan_enquiries_page.dart';
+
 
 void main() => runApp(const HastakalaApp());
 
@@ -21,12 +25,54 @@ class AppColors {
   static const green = Color(0xFF3C9A68);
 }
 
+final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
+
+void logoutBuyer([BuildContext? ctx]) {
+  currentBuyerSession = null;
+  final nav = rootNavigatorKey.currentState;
+  if (nav != null) {
+    nav.pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (route) => false,
+    );
+  } else if (ctx != null && ctx.mounted) {
+    Navigator.of(ctx).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (route) => false,
+    );
+  }
+}
+
+void switchToArtisan([BuildContext? ctx]) {
+  if (ctx != null && Navigator.canPop(ctx)) {
+    Navigator.pop(ctx);
+    return;
+  }
+  final nav = rootNavigatorKey.currentState;
+  if (nav != null) {
+    if (nav.canPop()) {
+      nav.pop();
+      return;
+    }
+    nav.pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const HomeScreen()),
+      (route) => false,
+    );
+  } else if (ctx != null && ctx.mounted) {
+    Navigator.of(ctx).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const HomeScreen()),
+      (route) => false,
+    );
+  }
+}
+
 class HastakalaApp extends StatelessWidget {
   const HastakalaApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: rootNavigatorKey,
       title: 'Hastakala',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
@@ -51,6 +97,18 @@ Widget logo({double width = 150}) => Image.asset(
   fit: BoxFit.contain,
   errorBuilder: (ctx, err, stack) => Icon(Icons.palette_outlined, size: width * 0.6, color: AppColors.gold),
 );
+
+
+Map<String, dynamic>? currentBuyerSession = {
+  'id': 1,
+  'organization_name': 'FabIndia B2B Procurement',
+  'contact_person': 'Sunita Verma',
+  'username': 'fabindia_buyer',
+  'buyer_type': 'Corporate Wholesale Buyer',
+  'location': 'Mumbai, Maharashtra',
+  'contact_email': 'b2b@fabindia.com',
+  'phone': '+91 98200 11223',
+};
 
 Map<String, dynamic>? currentArtisanSession = {
   'id': 1,
@@ -407,7 +465,7 @@ class SplashScreen extends StatelessWidget {
             ),
             const Spacer(),
             AppButton(
-              text: 'Begin your journey',
+              text: 'Get Started',
               icon: Icons.arrow_forward,
               onPressed: () => Navigator.pushReplacement(
                 context,
@@ -435,6 +493,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final FocusNode passwordFocusNode = FocusNode();
   bool obscurePassword = true;
   bool loading = false;
+  bool isBuyerPortal = false; // Toggle between Artisan and Buyer Login
 
   @override
   void dispose() {
@@ -458,30 +517,59 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => loading = true);
     try {
-      final res = await ApiService.loginArtisan(username, password);
-      if (!mounted) return;
-
-      if (res != null && res['status'] == 'success') {
-        currentArtisanSession = res['artisan'];
-        final artisanName = res['artisan']?['name'] ?? 'Artisan';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Welcome back, $artisanName! 🎉')),
-        );
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
-        );
+      if (isBuyerPortal) {
+        final res = await ApiService.loginBuyer(username, password);
+        if (!mounted) return;
+        if (res != null && res['status'] == 'success' && res['buyer'] != null) {
+          currentBuyerSession = res['buyer'];
+          final orgName = res['buyer']?['organization_name'] ?? 'Buyer';
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Welcome back, $orgName! 🏛️')),
+          );
+          rootNavigatorKey.currentState?.pushAndRemoveUntil(
+            MaterialPageRoute(
+              builder: (_) => BuyerHomeScreen(
+                buyerSession: currentBuyerSession,
+                onSwitchToArtisan: switchToArtisan,
+                onLogout: logoutBuyer,
+              ),
+            ),
+            (route) => false,
+          );
+        } else {
+          final detail = res?['detail'] ?? 'Invalid buyer username or password.';
+          passwordCtrl.clear();
+          passwordFocusNode.requestFocus();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(detail), backgroundColor: Colors.red.shade800),
+          );
+        }
       } else {
-        final detail = res?['detail'] ?? 'Invalid username or password. Please check your credentials.';
-        passwordCtrl.clear();
-        passwordFocusNode.requestFocus();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(detail),
-            backgroundColor: Colors.red.shade800,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        final res = await ApiService.loginArtisan(username, password);
+        if (!mounted) return;
+
+        if (res != null && res['status'] == 'success') {
+          currentArtisanSession = res['artisan'];
+          final artisanName = res['artisan']?['name'] ?? 'Artisan';
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Welcome back, $artisanName! 🎉')),
+          );
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const HomeScreen()),
+          );
+        } else {
+          final detail = res?['detail'] ?? 'Invalid username or password. Please check your credentials.';
+          passwordCtrl.clear();
+          passwordFocusNode.requestFocus();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(detail),
+              backgroundColor: Colors.red.shade800,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -524,10 +612,76 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Text('Welcome to Hastakala', textAlign: TextAlign.center, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.wine)),
-                    const SizedBox(height: 6),
-                    const Text('Sign in to your artisan business account', textAlign: TextAlign.center, style: TextStyle(color: AppColors.muted, fontSize: 13)),
-                    const SizedBox(height: 24),
+                    // Persona Switcher Tabs
+                    Container(
+                      padding: const EdgeInsets.all(4),
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade200,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => setState(() => isBuyerPortal = false),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 9),
+                                decoration: BoxDecoration(
+                                  color: !isBuyerPortal ? AppColors.wine : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  '👨‍🎨 Artisan Portal',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: !isBuyerPortal ? Colors.white : AppColors.muted,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => setState(() => isBuyerPortal = true),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 9),
+                                decoration: BoxDecoration(
+                                  color: isBuyerPortal ? AppColors.wine : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  '🏛️ Buyer Portal',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: isBuyerPortal ? Colors.white : AppColors.muted,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    Text(
+                      isBuyerPortal ? 'B2B Buyer Sign In' : 'Welcome to Hastakala',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.wine),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      isBuyerPortal
+                          ? 'Source authentic handcrafted products directly from rural artisans'
+                          : 'Sign in to your artisan business manager account',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: AppColors.muted, fontSize: 12),
+                    ),
+                    const SizedBox(height: 20),
 
                     TextField(
                       controller: usernameCtrl,
@@ -588,46 +742,114 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         child: loading
                             ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                            : const Text('Sign In 🚀', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                            : Text(isBuyerPortal ? 'Sign In as Buyer 🏛️' : 'Sign In as Artisan 🚀', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                       ),
                     ),
                     const SizedBox(height: 16),
 
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Text("Don't have an account? ", style: TextStyle(color: AppColors.muted, fontSize: 13)),
-                        GestureDetector(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => const RegisterScreen()),
-                            );
-                          },
-                          child: const Text(
-                            'Create New Account',
-                            style: TextStyle(color: AppColors.wine, fontWeight: FontWeight.bold, fontSize: 13, decoration: TextDecoration.underline),
+                    if (isBuyerPortal) ...[
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Text("New business buyer? ", style: TextStyle(color: AppColors.muted, fontSize: 13)),
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => BuyerAuthPage(
+                                    initialRegister: true,
+                                    onBuyerLoggedIn: (s) {
+                                      currentBuyerSession = s;
+                                      rootNavigatorKey.currentState?.pushAndRemoveUntil(
+                                        MaterialPageRoute(
+                                          builder: (_) => BuyerHomeScreen(
+                                            buyerSession: currentBuyerSession,
+                                            onSwitchToArtisan: switchToArtisan,
+                                            onLogout: logoutBuyer,
+                                          ),
+                                        ),
+                                        (route) => false,
+                                      );
+                                    },
+                                    onSwitchToArtisan: () => setState(() => isBuyerPortal = false),
+                                  ),
+                                ),
+                              );
+                            },
+                            child: const Text(
+                              'Register Organization',
+                              style: TextStyle(color: AppColors.wine, fontWeight: FontWeight.bold, fontSize: 13, decoration: TextDecoration.underline),
+                            ),
                           ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: AppColors.wine),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-
-                    TextButton(
-                      onPressed: () {
-                        currentArtisanSession = {
-                          'id': 0,
-                          'name': 'Guest Artisan',
-                          'username': 'guest',
-                          'phone': 'N/A',
-                          'gender': 'Artisan',
-                          'craft_type': 'Handloom & Handicrafts',
-                          'location': 'India',
-                        };
-                        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
-                      },
-                      child: const Text('Continue as Guest Artisan', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w600, fontSize: 13)),
-                    ),
+                        onPressed: () {
+                          currentBuyerSession = {
+                            'id': 0,
+                            'organization_name': 'Guest Buyer Organization',
+                            'contact_person': 'Guest Sourcing Manager',
+                            'username': 'guest_buyer',
+                            'buyer_type': 'Wholesale Buyer',
+                            'location': 'India',
+                          };
+                          rootNavigatorKey.currentState?.pushAndRemoveUntil(
+                            MaterialPageRoute(
+                              builder: (_) => BuyerHomeScreen(
+                                buyerSession: currentBuyerSession,
+                                onSwitchToArtisan: switchToArtisan,
+                                onLogout: logoutBuyer,
+                              ),
+                            ),
+                            (route) => false,
+                          );
+                        },
+                        icon: const Icon(Icons.explore_outlined, color: AppColors.wine, size: 18),
+                        label: const Text('Browse Marketplace as Guest Buyer 🛍️', style: TextStyle(color: AppColors.wine, fontWeight: FontWeight.bold, fontSize: 12)),
+                      ),
+                    ] else ...[
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Text("Don't have an artisan account? ", style: TextStyle(color: AppColors.muted, fontSize: 13)),
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => const RegisterScreen()),
+                              );
+                            },
+                            child: const Text(
+                              'Create New Account',
+                              style: TextStyle(color: AppColors.wine, fontWeight: FontWeight.bold, fontSize: 13, decoration: TextDecoration.underline),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      TextButton(
+                        onPressed: () {
+                          currentArtisanSession = {
+                            'id': 0,
+                            'name': 'Guest Artisan',
+                            'username': 'guest',
+                            'phone': 'N/A',
+                            'gender': 'Artisan',
+                            'craft_type': 'Handloom & Handicrafts',
+                            'location': 'India',
+                          };
+                          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
+                        },
+                        child: const Text('Continue as Guest Artisan', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w600, fontSize: 13)),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -972,6 +1194,11 @@ class _HomeScreenState extends State<HomeScreen> {
     ];
 
     return Scaffold(
+      appBar: AppBar(
+        backgroundColor: AppColors.cream,
+        elevation: 0,
+        title: Text(index == 0 ? 'Artisan Business Hub 🎨' : index == 1 ? 'My Product Catalog' : index == 2 ? 'Add Craft' : index == 3 ? 'B2B Leads & Buyers' : 'Artisan Profile', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+      ),
       body: pages[index],
       bottomNavigationBar: NavigationBar(
         selectedIndex: index,
@@ -1680,8 +1907,8 @@ class _AddProductPageState extends State<AddProductPage> {
   bool calculatingPricing = false;
 
   String selectedLanguage = 'Auto-Detect';
-  String detectedLanguage = 'Hindi (हिंदी)';
-  String translatedEnglishText = 'Handwoven Banarasi Cotton Saree with authentic Zari embroidery motifs';
+  String detectedLanguage = '';
+  String translatedEnglishText = '';
   bool isTranslating = false;
 
   Uint8List? selectedImageBytes;
@@ -1692,21 +1919,26 @@ class _AddProductPageState extends State<AddProductPage> {
 
   // PhotoRoom API Background Customizer State
   String selectedBgStyle = 'white';
-  final TextEditingController customBgPromptCtrl = TextEditingController(
-    text: "natural bamboo mat on sunny studio table"
-  );
+  final TextEditingController customBgPromptCtrl = TextEditingController();
 
   // Persistent Controllers across all phases
-  final TextEditingController voiceTextController = TextEditingController(
-    text: "Handwoven Banarasi Cotton Saree with authentic Zari embroidery motifs"
-  );
+  final TextEditingController voiceTextController = TextEditingController();
 
-  final TextEditingController titleCtrl = TextEditingController(text: "Handwoven Banarasi Silk & Cotton Saree");
-  final TextEditingController descEnCtrl = TextEditingController(text: "Exquisite handwoven Banarasi saree handcrafted by traditional master weavers.");
-  final TextEditingController descHiCtrl = TextEditingController(text: "पारंपरिक मास्टर बुनकरों द्वारा हस्तनिर्मित उत्कृष्ट हथकरघा बनारसी साड़ी।");
-  final TextEditingController catCtrl = TextEditingController(text: "Textiles  ›  Sarees");
-  final TextEditingController matCtrl = TextEditingController(text: "Pure Handloom Cotton & Zari Thread");
-  final TextEditingController tagsCtrl = TextEditingController(text: "Handloom • Saree • Traditional • Ethnic Wear • Banarasi");
+  final TextEditingController titleCtrl = TextEditingController();
+  final TextEditingController artTypeCtrl = TextEditingController();
+  final TextEditingController descEnCtrl = TextEditingController();
+  final TextEditingController descHiCtrl = TextEditingController();
+  final TextEditingController catCtrl = TextEditingController();
+  final TextEditingController matCtrl = TextEditingController();
+  final TextEditingController tagsCtrl = TextEditingController();
+
+  // Minimum Order Quantity (MOQ) & Volume Wholesale Tiers
+  int moq = 50;
+  late final TextEditingController moqCtrl;
+  List<Map<String, dynamic>> bulkTiers = [];
+
+  bool get isAnyProcessRunning =>
+      processing || publishing || isListening || isTranslating || calculatingPricing || _isTranslatingField;
 
   // Dynamic Pricing Sliders State
   double materialCost = 450.0;
@@ -1819,6 +2051,7 @@ class _AddProductPageState extends State<AddProductPage> {
 
   @override
   void dispose() {
+    moqCtrl.dispose();
     _enTranslationDebounce?.cancel();
     _regionalTranslationDebounce?.cancel();
     super.dispose();
@@ -1827,8 +2060,118 @@ class _AddProductPageState extends State<AddProductPage> {
   @override
   void initState() {
     super.initState();
+    moqCtrl = TextEditingController(text: '50');
     _fetchPricing();
     _translateCurrentText();
+  }
+
+  void _initBulkTiers({bool force = false}) {
+    if (!force && bulkTiers.isNotEmpty) return;
+
+    final wholesale = (pricingData?['price_wholesale'] as num?)?.toDouble() ?? 750.0;
+    final minPrice = (pricingData?['min_price'] as num?)?.toDouble() ?? (wholesale * 0.85);
+
+    final tier1Price = wholesale;
+    final tier2Price = ((wholesale * 0.92) < minPrice) ? minPrice : (wholesale * 0.92);
+    final tier3Price = ((wholesale * 0.85) < minPrice) ? minPrice : (wholesale * 0.85);
+
+    final tier1End = moq < 50 ? 49 : (moq + 49);
+    final tier2Start = tier1End + 1;
+    final tier2End = tier2Start + 150;
+    final tier3Start = tier2End + 1;
+
+    bulkTiers = [
+      {
+        'tier': 'Tier 1 (Base MOQ)',
+        'range': '$moq–$tier1End pieces',
+        'min_qty': moq,
+        'max_qty': tier1End,
+        'price': tier1Price.roundToDouble(),
+        'discount': 'Base Wholesale Rate',
+      },
+      {
+        'tier': 'Tier 2 (Volume Bulk)',
+        'range': '$tier2Start–$tier2End pieces',
+        'min_qty': tier2Start,
+        'max_qty': tier2End,
+        'price': tier2Price.roundToDouble(),
+        'discount': '8% Volume Discount',
+      },
+      {
+        'tier': 'Tier 3 (Mega Order)',
+        'range': '$tier3Start+ pieces',
+        'min_qty': tier3Start,
+        'max_qty': null,
+        'price': tier3Price.roundToDouble(),
+        'discount': '15% Mega Discount',
+      },
+    ];
+  }
+
+  void _setMoq(int newMoq) {
+    if (newMoq < 1) return;
+    setState(() {
+      moq = newMoq;
+      moqCtrl.text = moq.toString();
+      _initBulkTiers(force: true);
+    });
+  }
+
+  void _showAddTierDialog() {
+    final rangeCtrl = TextEditingController(text: '${moq * 5}+ pieces');
+    final priceCtrl = TextEditingController(
+      text: ((pricingData?['min_price'] as num?)?.toInt() ?? 500).toString(),
+    );
+    final discountCtrl = TextEditingController(text: 'Custom Volume Rate');
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Add Custom Quantity Tier', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: AppColors.wine)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: rangeCtrl,
+              decoration: const InputDecoration(labelText: 'Quantity Range', hintText: 'e.g. 250–499 pieces'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: priceCtrl,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Wholesale Unit Price (₹)', prefixText: '₹ '),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: discountCtrl,
+              decoration: const InputDecoration(labelText: 'Discount Label', hintText: 'e.g. 12% Bulk Offer'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.wine, foregroundColor: Colors.white),
+            onPressed: () {
+              final p = double.tryParse(priceCtrl.text) ?? 500.0;
+              setState(() {
+                bulkTiers.add({
+                  'tier': 'Tier ${bulkTiers.length + 1}',
+                  'range': rangeCtrl.text.isNotEmpty ? rangeCtrl.text : 'Bulk Tier',
+                  'min_qty': moq,
+                  'max_qty': null,
+                  'price': p,
+                  'discount': discountCtrl.text.isNotEmpty ? discountCtrl.text : 'Volume Rate',
+                });
+              });
+              Navigator.pop(ctx);
+            },
+            child: const Text('Add Tier'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _translateCurrentText() async {
@@ -1866,6 +2209,7 @@ class _AddProductPageState extends State<AddProductPage> {
       setState(() {
         pricingData = result;
         calculatingPricing = false;
+        _initBulkTiers();
       });
     }
   }
@@ -1881,6 +2225,9 @@ class _AddProductPageState extends State<AddProductPage> {
     if (regDesc != null && regDesc.toString().isNotEmpty) {
       descHiCtrl.text = regDesc.toString();
     }
+    if (catalog['type_of_art'] != null && catalog['type_of_art'].toString().isNotEmpty) {
+      artTypeCtrl.text = catalog['type_of_art'];
+    }
     if (catalog['category'] != null && catalog['category'].toString().isNotEmpty) {
       catCtrl.text = catalog['category'];
     }
@@ -1894,12 +2241,12 @@ class _AddProductPageState extends State<AddProductPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (processing) {
+    if (processing && step == 1) {
       return AIProcessingPage(
         onComplete: () {
           setState(() {
             processing = false;
-            step = 2; // Jump to Review Phase
+            step = 2; // Jump to Review Phase after voice catalog generation
           });
         },
       );
@@ -1939,13 +2286,17 @@ class _AddProductPageState extends State<AddProductPage> {
       children: List.generate(4, (i) {
         final isActive = i == step;
         final isCompleted = i < step;
+        final bool canTap = !isAnyProcessRunning && (
+          i == 0 ||
+          (i == 1 && selectedImageBytes != null) ||
+          (i == 2 && selectedImageBytes != null && generatedCatalogResult != null) ||
+          (i == 3 && selectedImageBytes != null && generatedCatalogResult != null)
+        );
+
         return Expanded(
           child: InkWell(
             borderRadius: BorderRadius.circular(12),
-            onTap: () {
-              // Tappable phase step indicators so users can jump to any step!
-              setState(() => step = i);
-            },
+            onTap: canTap ? () => setState(() => step = i) : null,
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 4),
               child: Column(
@@ -1994,7 +2345,73 @@ class _AddProductPageState extends State<AddProductPage> {
 
   Widget _buildBottomNavigationRow() {
     final backLabels = ['', 'Back to Photo', 'Back to Voice', 'Back to Review'];
-    final nextLabels = ['Next: Voice →', 'Next: Review →', 'Next: Pricing →', 'Publish Product 🚀'];
+
+    // Strict process checking: until any process is finished, Next is disabled!
+    bool isNextEnabled = false;
+    String nextButtonLabel = '';
+    Widget nextButtonIcon = const Icon(Icons.arrow_forward, size: 18);
+
+    if (step == 0) {
+      if (processing) {
+        isNextEnabled = false;
+        nextButtonLabel = 'Enhancing Photo...';
+        nextButtonIcon = const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2));
+      } else if (selectedImageBytes == null) {
+        isNextEnabled = false;
+        nextButtonLabel = 'Select Photo First';
+        nextButtonIcon = const Icon(Icons.add_a_photo_outlined, size: 18);
+      } else {
+        isNextEnabled = true;
+        nextButtonLabel = 'Next: Voice →';
+        nextButtonIcon = const Icon(Icons.arrow_forward, size: 18);
+      }
+    } else if (step == 1) {
+      if (processing) {
+        isNextEnabled = false;
+        nextButtonLabel = 'Generating AI Catalog...';
+        nextButtonIcon = const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2));
+      } else if (isListening) {
+        isNextEnabled = false;
+        nextButtonLabel = 'Recording Microphone...';
+        nextButtonIcon = const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2));
+      } else if (isTranslating) {
+        isNextEnabled = false;
+        nextButtonLabel = 'Translating...';
+        nextButtonIcon = const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2));
+      } else {
+        isNextEnabled = true;
+        nextButtonLabel = 'Next: Review →';
+        nextButtonIcon = const Icon(Icons.arrow_forward, size: 18);
+      }
+    } else if (step == 2) {
+      if (_isTranslatingField) {
+        isNextEnabled = false;
+        nextButtonLabel = 'Translating Description...';
+        nextButtonIcon = const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2));
+      } else if (titleCtrl.text.trim().isEmpty) {
+        isNextEnabled = false;
+        nextButtonLabel = 'Enter Product Name';
+        nextButtonIcon = const Icon(Icons.edit, size: 18);
+      } else {
+        isNextEnabled = !isAnyProcessRunning;
+        nextButtonLabel = 'Next: Pricing →';
+        nextButtonIcon = const Icon(Icons.arrow_forward, size: 18);
+      }
+    } else if (step == 3) {
+      if (calculatingPricing) {
+        isNextEnabled = false;
+        nextButtonLabel = 'Calculating Pricing...';
+        nextButtonIcon = const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2));
+      } else if (publishing) {
+        isNextEnabled = false;
+        nextButtonLabel = 'Publishing Product...';
+        nextButtonIcon = const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2));
+      } else {
+        isNextEnabled = !isAnyProcessRunning;
+        nextButtonLabel = 'Publish Product 🚀';
+        nextButtonIcon = const Icon(Icons.rocket_launch_outlined, size: 18);
+      }
+    }
 
     return Row(
       children: [
@@ -2003,7 +2420,7 @@ class _AddProductPageState extends State<AddProductPage> {
             child: SizedBox(
               height: 52,
               child: OutlinedButton.icon(
-                onPressed: () {
+                onPressed: isAnyProcessRunning ? null : () {
                   setState(() {
                     step = step - 1;
                   });
@@ -2027,17 +2444,17 @@ class _AddProductPageState extends State<AddProductPage> {
           child: SizedBox(
             height: 52,
             child: FilledButton.icon(
-              onPressed: publishing ? null : _onNextPressed,
-              icon: publishing
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                  : Icon(step == 3 ? Icons.rocket_launch_outlined : Icons.arrow_forward, size: 18),
+              onPressed: isNextEnabled ? _onNextPressed : null,
+              icon: nextButtonIcon,
               label: Text(
-                nextLabels[step],
+                nextButtonLabel,
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
               ),
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.wine,
+                disabledBackgroundColor: AppColors.wine.withValues(alpha: 0.35),
                 foregroundColor: Colors.white,
+                disabledForegroundColor: Colors.white70,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
               ),
             ),
@@ -2047,31 +2464,75 @@ class _AddProductPageState extends State<AddProductPage> {
     );
   }
 
-  void _onNextPressed() async {
-    if (step == 0) {
-      setState(() => step = 1);
-    } else if (step == 1) {
-      // If voice text provided and catalog not generated yet, generate catalog automatically
-      if (voiceTextController.text.trim().isNotEmpty && generatedCatalogResult == null) {
-        setState(() => processing = true);
-        final imgUrl = enhancedImageResult?['enhanced_image_url'] ?? enhancedImageResult?['raw_image_url'] ?? '';
-        final catalog = await ApiService.generateCatalog(
-          voiceTextController.text,
-          language: selectedLanguage,
-          imageUrl: imgUrl,
-        );
-        if (catalog != null) {
-          _syncCatalogToControllers(catalog);
-          generatedCatalogResult = catalog;
-        }
+  Future<void> _generateCatalog() async {
+    final text = voiceTextController.text.trim();
+    if (text.isEmpty && selectedImageBytes == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please upload a product photo or record your voice description.')),
+      );
+      return;
+    }
+
+    setState(() => processing = true);
+    final imgUrl = enhancedImageResult?['enhanced_image_url'] ?? enhancedImageResult?['raw_image_url'] ?? '';
+    final String b64 = (selectedImageBytes != null) ? base64Encode(selectedImageBytes!) : '';
+
+    final catalog = await ApiService.generateCatalog(
+      text,
+      language: selectedLanguage,
+      imageUrl: imgUrl,
+      imageBase64: b64,
+    );
+
+    if (mounted) {
+      if (catalog != null) {
+        _syncCatalogToControllers(catalog);
+        generatedCatalogResult = catalog;
         setState(() {
           processing = false;
-          step = 2;
+          step = 2; // Jump to Review Step
         });
+        final artType = catalog['type_of_art'] ?? 'Artisan Craft';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('AI Catalog Generated! ($artType) ✨'),
+            backgroundColor: AppColors.green,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      } else {
+        setState(() => processing = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not reach AI cataloger. You can edit details manually in Review.')),
+        );
+      }
+    }
+  }
+
+  void _onNextPressed() async {
+    if (isAnyProcessRunning) return;
+
+    if (step == 0) {
+      if (selectedImageBytes == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please select or capture a product photo first.')),
+        );
+        return;
+      }
+      setState(() => step = 1);
+    } else if (step == 1) {
+      if (generatedCatalogResult == null) {
+        await _generateCatalog();
       } else {
         setState(() => step = 2);
       }
     } else if (step == 2) {
+      if (titleCtrl.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please enter a product title before continuing to pricing.')),
+        );
+        return;
+      }
       _fetchPricing();
       setState(() => step = 3);
     } else if (step == 3) {
@@ -2092,6 +2553,7 @@ class _AddProductPageState extends State<AddProductPage> {
 
     final success = await ApiService.publishProduct({
       'title': titleCtrl.text.isNotEmpty ? titleCtrl.text : 'Handcrafted Artisan Product',
+      'type_of_art': artTypeCtrl.text.isNotEmpty ? artTypeCtrl.text : 'Traditional Indian Craft',
       'description_en': descEnCtrl.text,
       'description_hi': descHiCtrl.text,
       'category': catCtrl.text,
@@ -2103,6 +2565,17 @@ class _AddProductPageState extends State<AddProductPage> {
       'material_cost': materialCost,
       'labor_cost': laborHours * laborRate,
       'production_days': (laborHours / 8).ceil(),
+      'moq': moq,
+      'bulk_pricing': bulkTiers,
+      'available_qty': 500,
+      'bulk_available': 1,
+      'custom_size': 1,
+      'custom_design': 1,
+      'custom_packaging': 1,
+      'monthly_capacity': 1000,
+      'production_time': '${(laborHours / 8).ceil()}–${(laborHours / 8).ceil() + 2} days',
+      'artisan_name': currentArtisanSession?['name'] ?? 'Ramesh Kumar',
+      'artisan_location': currentArtisanSession?['location'] ?? 'West Bengal',
       'raw_image_url': enhancedImageResult?['raw_image_url'] ?? '',
       'enhanced_image_url': enhancedImageResult?['enhanced_image_url'] ?? '',
       if (artisanId != null) 'artisan_id': artisanId,
@@ -2120,6 +2593,7 @@ class _AddProductPageState extends State<AddProductPage> {
   }
 
   static const Map<String, Map<String, String>> _bgStyles = {
+    'transparent': {'label': 'Remove BG (Cutout)', 'icon': '✂️', 'desc': 'PhotoRoom Sandbox Cutout'},
     'white': {'label': 'Clean White', 'icon': '⚪', 'desc': 'Pure studio white background'},
     'wood': {'label': 'Rustic Wood', 'icon': '🪵', 'desc': 'Warm wooden table setup'},
     'marble': {'label': 'Luxury Marble', 'icon': '🏛️', 'desc': 'Elegant marble showcase'},
@@ -2135,10 +2609,10 @@ class _AddProductPageState extends State<AddProductPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('1. AI Image Studio & Enhancer', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          const Text('1. AI Image Studio & Background Remover', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
           const SizedBox(height: 6),
           const Text(
-            'Powered by PhotoRoom API. Pick an e-commerce background theme and upload your product photo.',
+            'Powered by PhotoRoom Sandbox API. Select Remove BG (Cutout) or an e-commerce theme to isolate and enhance your product.',
             style: TextStyle(color: AppColors.muted),
           ),
           const SizedBox(height: 14),
@@ -2370,7 +2844,10 @@ class _AddProductPageState extends State<AddProductPage> {
 
   Future<void> _reEnhanceWithPhotoRoom() async {
     if (selectedImageBytes == null) return;
-    setState(() => processing = true);
+    setState(() {
+      processing = true;
+      generatedCatalogResult = null;
+    });
     final result = await ApiService.enhanceImage(
       selectedImageBytes!,
       originalFileName ?? 'product.jpg',
@@ -2394,6 +2871,7 @@ class _AddProductPageState extends State<AddProductPage> {
         setState(() {
           selectedImageBytes = bytes;
           originalFileName = picked.name;
+          generatedCatalogResult = null;
           processing = true;
         });
         final result = await ApiService.enhanceImage(
@@ -2429,10 +2907,45 @@ class _AddProductPageState extends State<AddProductPage> {
 
     return SingleChildScrollView(
       child: Column(children: [
-        const Text('2. Multilingual Voice Cataloger', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+        const Text('2. Multilingual Voice & Multimodal Cataloger', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
         const SizedBox(height: 6),
         const Text('Speak into your microphone or type details in any regional language.', textAlign: TextAlign.center, style: TextStyle(color: AppColors.muted)),
-        const SizedBox(height: 16),
+        const SizedBox(height: 14),
+
+        // Photo Attachment Status for Multimodal Input
+        if (selectedImageBytes != null) ...[
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFE2D8D1)),
+            ),
+            child: Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.memory(selectedImageBytes!, width: 44, height: 44, fit: BoxFit.cover),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Product Photo Attached (Vision Input)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.wine)),
+                      Text(
+                        enhancedImageResult != null ? 'Enhanced Studio Cutout ready for AI analysis' : 'Photo ready for AI analysis',
+                        style: const TextStyle(fontSize: 11, color: AppColors.muted),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.check_circle, color: AppColors.green, size: 20),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
         
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -2476,10 +2989,13 @@ class _AddProductPageState extends State<AddProductPage> {
         TextField(
           controller: voiceTextController,
           maxLines: 3,
-          onChanged: (_) => _translateCurrentText(),
+          onChanged: (_) {
+            generatedCatalogResult = null;
+            _translateCurrentText();
+          },
           decoration: InputDecoration(
             labelText: 'Spoken Description / Transcript',
-            hintText: 'Speak using mic or type e.g. यह सूती धागे से बनी हाथ से बुनी साड़ी है...',
+            hintText: 'Speak using mic or type craft details...',
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
             filled: true,
             fillColor: Colors.white,
@@ -2543,6 +3059,31 @@ class _AddProductPageState extends State<AddProductPage> {
             ),
           ),
         ],
+
+        const SizedBox(height: 14),
+
+        // Generate AI Catalog CTA Button
+        SizedBox(
+          width: double.infinity,
+          height: 50,
+          child: FilledButton.icon(
+            onPressed: isAnyProcessRunning ? null : _generateCatalog,
+            icon: processing
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Icon(Icons.auto_awesome, size: 20),
+            label: Text(
+              processing ? 'Analyzing Product & Craft Details...' : 'Generate AI Catalog ✨',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+            ),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.wine,
+              disabledBackgroundColor: AppColors.wine.withValues(alpha: 0.4),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              elevation: 2,
+            ),
+          ),
+        ),
 
         const SizedBox(height: 16),
 
@@ -2691,8 +3232,8 @@ class _AddProductPageState extends State<AddProductPage> {
         children: [
           const Text('3. Review & Edit AI Catalog', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
           const SizedBox(height: 6),
-          const Text('Review AI-generated attributes. Feel free to edit any field before pricing.', style: TextStyle(color: AppColors.muted)),
           const SizedBox(height: 16),
+
           if (enhancedImageResult != null)
             Container(
               height: 160,
@@ -2705,17 +3246,19 @@ class _AddProductPageState extends State<AddProductPage> {
               ),
             ),
           const SizedBox(height: 16),
-          _editableField('Product Name', titleCtrl),
-          _editableField('English Description (SEO)', descEnCtrl, maxLines: 4),
-          _editableField('Category', catCtrl),
-          _editableField('Materials', matCtrl),
-          _editableField('Tags', tagsCtrl),
+          _editableField('Product Name', titleCtrl, hintText: 'e.g. Handcrafted Ceramic Teacup'),
+          _editableField('Type of Art / Craft Heritage', artTypeCtrl, hintText: 'e.g. Terracotta Pottery, Handloom Weaving'),
+          _editableField('Category', catCtrl, hintText: 'e.g. Pottery & Clay, Handloom & Textiles'),
+          _editableField('English Description (SEO)', descEnCtrl, maxLines: 4, onChanged: _onEnChanged, hintText: 'Detailed e-commerce product description in English'),
+          _editableField('Regional Description', descHiCtrl, maxLines: 3, onChanged: _onRegionalChanged, hintText: 'विवरण / Regional description'),
+          _editableField('Materials', matCtrl, hintText: 'e.g. Natural Bio-Clay, Organic Cotton'),
+          _editableField('Tags', tagsCtrl, hintText: 'e.g. Handmade • Artisanal • Sustainable'),
         ],
       ),
     );
   }
 
-  Widget _editableField(String label, TextEditingController controller, {int maxLines = 1}) => Padding(
+  Widget _editableField(String label, TextEditingController controller, {int maxLines = 1, ValueChanged<String>? onChanged, String? hintText}) => Padding(
     padding: const EdgeInsets.only(bottom: 12),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text(label, style: const TextStyle(fontSize: 12, color: AppColors.muted, fontWeight: FontWeight.bold)),
@@ -2723,7 +3266,10 @@ class _AddProductPageState extends State<AddProductPage> {
       TextField(
         controller: controller,
         maxLines: maxLines,
+        onChanged: onChanged,
         decoration: InputDecoration(
+          hintText: hintText,
+          hintStyle: const TextStyle(color: Color(0xFFB5A9A0), fontSize: 13),
           filled: true,
           fillColor: Colors.white,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2D8D1))),
@@ -2802,6 +3348,281 @@ class _AddProductPageState extends State<AddProductPage> {
               ]),
             ),
           ),
+
+          // Minimum Order Quantity (MOQ) Setting Card
+          const SizedBox(height: 16),
+          Card(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            elevation: 1,
+            color: Colors.white,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: const [
+                      Icon(Icons.inventory_2_outlined, color: AppColors.wine, size: 20),
+                      SizedBox(width: 8),
+                      Text('Minimum Order Quantity (MOQ)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.wine)),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'The lowest number of pieces a wholesale buyer can order in a single B2B enquiry.',
+                    style: TextStyle(color: AppColors.muted, fontSize: 12),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      IconButton.filledTonal(
+                        onPressed: () {
+                          if (moq > 5) _setMoq(moq - 5);
+                        },
+                        icon: const Icon(Icons.remove),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          controller: moqCtrl,
+                          keyboardType: TextInputType.number,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: AppColors.wine),
+                          decoration: InputDecoration(
+                            suffixText: 'pieces',
+                            contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          onSubmitted: (val) {
+                            final parsed = int.tryParse(val);
+                            if (parsed != null && parsed > 0) {
+                              _setMoq(parsed);
+                            } else {
+                              moqCtrl.text = moq.toString();
+                            }
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton.filled(
+                        style: IconButton.styleFrom(backgroundColor: AppColors.wine),
+                        onPressed: () => _setMoq(moq + 5),
+                        icon: const Icon(Icons.add, color: Colors.white),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  const Text('Quick Presets:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.muted)),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [10, 25, 50, 100, 200, 500].map((preset) {
+                      final isSelected = moq == preset;
+                      return ChoiceChip(
+                        label: Text('$preset pcs'),
+                        selected: isSelected,
+                        selectedColor: AppColors.wine,
+                        backgroundColor: Colors.white,
+                        labelStyle: TextStyle(
+                          color: isSelected ? Colors.white : AppColors.wine,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                          fontSize: 11,
+                        ),
+                        onSelected: (selected) {
+                          if (selected) _setMoq(preset);
+                        },
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Tiered Wholesale Pricing for Different Quantities Card
+          const SizedBox(height: 16),
+          Card(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            elevation: 1,
+            color: Colors.white,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: const [
+                          Icon(Icons.layers_outlined, color: AppColors.wine, size: 20),
+                          SizedBox(width: 8),
+                          Text('Wholesale Price by Quantity', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.wine)),
+                        ],
+                      ),
+                      TextButton.icon(
+                        onPressed: () => _initBulkTiers(force: true),
+                        icon: const Icon(Icons.refresh, size: 14, color: AppColors.green),
+                        label: const Text('Reset AI Tiers', style: TextStyle(fontSize: 12, color: AppColors.green, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Set volume discounts for different order brackets. Buyers who order more units get better rates.',
+                    style: TextStyle(color: AppColors.muted, fontSize: 12),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Tiers List
+                  if (bulkTiers.isEmpty) ...[
+                    Center(
+                      child: TextButton.icon(
+                        onPressed: () => _initBulkTiers(force: true),
+                        icon: const Icon(Icons.auto_awesome),
+                        label: const Text('Generate Recommended Wholesale Tiers'),
+                      ),
+                    ),
+                  ] else ...[
+                    ...List.generate(bulkTiers.length, (idx) {
+                      final tier = bulkTiers[idx];
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFBF8F5),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFFEADBCE)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.wine.withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        tier['tier'] ?? 'Tier ${idx + 1}',
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.wine),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFE8F5E9),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        tier['discount'] ?? 'Volume Discount',
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: AppColors.green),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                if (bulkTiers.length > 1)
+                                  IconButton(
+                                    visualDensity: VisualDensity.compact,
+                                    padding: EdgeInsets.zero,
+                                    icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                                    onPressed: () {
+                                      setState(() {
+                                        bulkTiers.removeAt(idx);
+                                      });
+                                    },
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Expanded(
+                                  flex: 5,
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text('Quantity Range', style: TextStyle(fontSize: 11, color: AppColors.muted, fontWeight: FontWeight.bold)),
+                                      const SizedBox(height: 4),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          borderRadius: BorderRadius.circular(10),
+                                          border: Border.all(color: const Color(0xFFE2D8D1)),
+                                        ),
+                                        child: Text(
+                                          tier['range'] ?? '',
+                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  flex: 6,
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text('Wholesale Unit Price', style: TextStyle(fontSize: 11, color: AppColors.muted, fontWeight: FontWeight.bold)),
+                                      const SizedBox(height: 4),
+                                      TextFormField(
+                                        key: ValueKey('tier_${idx}_${tier['price']}'),
+                                        initialValue: (tier['price'] as num?)?.toInt().toString() ?? '500',
+                                        keyboardType: TextInputType.number,
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.wine),
+                                        decoration: InputDecoration(
+                                          prefixText: '₹ ',
+                                          suffixText: '/ pc',
+                                          isDense: true,
+                                          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                          fillColor: Colors.white,
+                                          filled: true,
+                                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                                        ),
+                                        onChanged: (newPrice) {
+                                          final p = double.tryParse(newPrice);
+                                          if (p != null) {
+                                            tier['price'] = p;
+                                          }
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                    const SizedBox(height: 6),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _showAddTierDialog,
+                        icon: const Icon(Icons.add_circle_outline, size: 18, color: AppColors.wine),
+                        label: const Text('Add Custom Wholesale Quantity Tier', style: TextStyle(color: AppColors.wine, fontWeight: FontWeight.bold, fontSize: 13)),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: AppColors.wine),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -2863,7 +3684,14 @@ class PublishedPage extends StatelessWidget {
         const SizedBox(height: 10),
         const Text('Your product is now listed and available to GeM & B2B buyers across India.', textAlign: TextAlign.center, style: TextStyle(color: AppColors.muted)),
         const SizedBox(height: 34),
-        AppButton(text: 'Return to Dashboard', onPressed: () => Navigator.popUntil(context, (r) => r.isFirst)),
+        AppButton(
+          text: 'Return to Home Page 🏠',
+          onPressed: () => Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (_) => const HomeScreen()),
+            (r) => false,
+          ),
+        ),
       ]),
     )),
   );
@@ -3024,9 +3852,81 @@ class _ProductsPageState extends State<ProductsPage> {
                 ),
               ),
               const SizedBox(height: 16),
+              if (p['type_of_art'] != null && p['type_of_art'].toString().isNotEmpty)
+                _detailRow('Type of Art', p['type_of_art'].toString(), Icons.palette_outlined),
+              _detailRow('Minimum Order Quantity (MOQ)', '${p['moq'] ?? 50} pieces', Icons.inventory_2_outlined),
               _detailRow('Category', p['category'] ?? 'N/A', Icons.category_outlined),
-              _detailRow('Materials', p['materials'] ?? 'N/A', Icons.inventory_2_outlined),
+              _detailRow('Materials', p['materials'] ?? 'N/A', Icons.format_paint_outlined),
               _detailRow('Tags', p['tags'] ?? 'N/A', Icons.local_offer_outlined),
+              if (p['bulk_pricing'] is List && (p['bulk_pricing'] as List).isNotEmpty) ...[
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 6),
+                  child: Text(
+                    'Wholesale Pricing by Quantity',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.wine),
+                  ),
+                ),
+                Container(
+                  margin: const EdgeInsets.only(bottom: 14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFECE3DD)),
+                  ),
+                  child: Column(
+                    children: (p['bulk_pricing'] as List).map<Widget>((tier) {
+                      final t = tier is Map ? tier : <String, dynamic>{};
+                      final range = t['range'] ?? '${t['min_qty'] ?? 0}+ pieces';
+                      final price = t['price'] != null ? '₹${t['price']}' : '₹0';
+                      final discount = t['discount']?.toString() ?? '';
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          border: Border(bottom: BorderSide(color: Colors.grey.shade100)),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              range.toString(),
+                              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                            ),
+                            Row(
+                              children: [
+                                if (discount.isNotEmpty)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    margin: const EdgeInsets.only(right: 8),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.green.withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      discount,
+                                      style: const TextStyle(
+                                        color: AppColors.green,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                Text(
+                                  price,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                    color: AppColors.wine,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ],
               _detailRow('Description', p['description_en'] ?? 'N/A', Icons.description_outlined, isLongText: true),
               const SizedBox(height: 24),
               SizedBox(
@@ -3855,14 +4755,22 @@ class BuyersPage extends StatefulWidget {
   @override State<BuyersPage> createState() => _BuyersPageState();
 }
 
-class _BuyersPageState extends State<BuyersPage> {
+class _BuyersPageState extends State<BuyersPage> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
   List<dynamic> buyers = [];
   bool loading = true;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _loadBuyers();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadBuyers() async {
@@ -3876,39 +4784,65 @@ class _BuyersPageState extends State<BuyersPage> {
   }
 
   @override
-  Widget build(BuildContext context) => PageShell(
-    title: 'Verified B2B Buyers & GeM',
-    child: loading
-        ? const Center(child: CircularProgressIndicator())
-        : ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: buyers.length,
-            itemBuilder: (_, i) {
-              final b = buyers[i];
-              return Card(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                margin: const EdgeInsets.only(bottom: 12),
-                child: ListTile(
-                  contentPadding: const EdgeInsets.all(14),
-                  leading: const CircleAvatar(backgroundColor: AppColors.wine, child: Icon(Icons.store, color: Colors.white)),
-                  title: Text(b['organization_name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    const SizedBox(height: 4),
-                    Text('${b['buyer_type']} • ${b['location']}'),
-                    const SizedBox(height: 4),
-                    Text('Target: ${b['target_category']}', style: const TextStyle(fontSize: 11, color: AppColors.muted)),
-                    Text('Min Order: ${b['min_order_qty']} units', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.green)),
-                  ]),
-                  trailing: ElevatedButton(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Connecting to ${b['organization_name']}...')));
-                    },
-                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.wine, foregroundColor: Colors.white),
-                    child: const Text('Connect'),
-                  ),
-                ),
-              );
-            },
-          ),
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: AppColors.cream,
+    appBar: AppBar(
+      title: const Text('B2B Leads & Buyers', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+      backgroundColor: AppColors.cream,
+      elevation: 0,
+      bottom: TabBar(
+        controller: _tabController,
+        labelColor: AppColors.wine,
+        unselectedLabelColor: AppColors.muted,
+        indicatorColor: AppColors.wine,
+        indicatorWeight: 3,
+        tabs: const [
+          Tab(text: 'Received Enquiries 📩', icon: Icon(Icons.mail_outline_rounded, size: 18)),
+          Tab(text: 'Verified Buyers 🏢', icon: Icon(Icons.verified_outlined, size: 18)),
+        ],
+      ),
+    ),
+    body: TabBarView(
+      controller: _tabController,
+      children: [
+        ArtisanEnquiriesPage(artisanSession: currentArtisanSession),
+        loading
+            ? const Center(child: CircularProgressIndicator(color: AppColors.wine))
+            : ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: buyers.length,
+                itemBuilder: (_, i) {
+                  final b = buyers[i];
+                  return Card(
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: const BorderSide(color: Color(0xFFECE3DD)),
+                    ),
+                    margin: const EdgeInsets.only(bottom: 12),
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.all(14),
+                      leading: const CircleAvatar(backgroundColor: AppColors.wine, child: Icon(Icons.store, color: Colors.white)),
+                      title: Text(b['organization_name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        const SizedBox(height: 4),
+                        Text('${b['buyer_type']} • ${b['location']}'),
+                        const SizedBox(height: 4),
+                        Text('Target: ${b['target_category']}', style: const TextStyle(fontSize: 11, color: AppColors.muted)),
+                        Text('Min Order: ${b['min_order_qty']} units', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.green)),
+                      ]),
+                      trailing: ElevatedButton(
+                        onPressed: () {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Connecting to ${b['organization_name']}...')));
+                        },
+                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.wine, foregroundColor: Colors.white),
+                        child: const Text('Connect'),
+                      ),
+                    ),
+                  );
+                },
+              ),
+      ],
+    ),
   );
 }

@@ -2,7 +2,7 @@ from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Union
 from datetime import datetime
 import json
 import os
@@ -12,13 +12,14 @@ from hastakala_backend.database import (
     init_db, get_db_info, connect_mongodb,
     db_get_dashboard_stats, db_get_all_products, db_get_product_by_id,
     db_create_product, db_delete_product, db_register_artisan, db_login_artisan, db_update_artisan_profile,
-    db_get_due_orders
+    db_get_due_orders, db_register_buyer, db_login_buyer, db_create_enquiry,
+    db_get_product_enquiries, db_update_enquiry_status, db_get_ai_recommendations,
+    db_get_verified_buyers
 )
 from hastakala_backend.services.image_service import enhance_product_image
 from hastakala_backend.services.catalog_service import generate_catalog_from_voice_or_text, translate_regional_text
 from hastakala_backend.services.pricing_service import calculate_dynamic_pricing
 from hastakala_backend.services.assistant_service import chat_with_assistant
-from hastakala_backend.services.buyer_service import get_verified_buyers, get_product_enquiries
 
 # Initialize Database
 try:
@@ -28,8 +29,8 @@ except Exception as _e:
 
 app = FastAPI(
     title="Hastakala AI Backend API",
-    description="Backend architecture for Hastakala - AI-Powered Business Manager for Traditional Artisans",
-    version="1.0.0"
+    description="Backend architecture for Hastakala - AI-Powered Business Manager & B2B Marketplace for Traditional Artisans",
+    version="1.1.0"
 )
 
 # Enable CORS for Flutter mobile & web clients
@@ -50,6 +51,7 @@ class CatalogRequest(BaseModel):
     voice_text: Optional[str] = ""
     language: Optional[str] = "Auto-Detect"
     image_url: Optional[str] = ""
+    image_base64: Optional[str] = ""
 
 class TranslateRequest(BaseModel):
     text: str
@@ -69,6 +71,7 @@ class ProductCreate(BaseModel):
     description_en: str
     description_hi: str
     category: str
+    type_of_art: Optional[str] = "Traditional Indian Craft"
     materials: str
     tags: str
     price_retail: float
@@ -79,8 +82,19 @@ class ProductCreate(BaseModel):
     production_days: Optional[int] = 2
     raw_image_url: Optional[str] = ""
     enhanced_image_url: Optional[str] = ""
-    artisan_id: Optional[int] = None
-    artisan_username: Optional[str] = None
+    artisan_id: Optional[int] = 1
+    artisan_username: Optional[str] = "ramesh_artisan"
+    artisan_name: Optional[str] = "Ramesh Kumar"
+    artisan_location: Optional[str] = "West Bengal"
+    moq: Optional[int] = 50
+    available_qty: Optional[int] = 500
+    bulk_available: Optional[int] = 1
+    custom_size: Optional[int] = 1
+    custom_design: Optional[int] = 1
+    custom_packaging: Optional[int] = 1
+    monthly_capacity: Optional[int] = 1000
+    production_time: Optional[str] = "3–5 days"
+    bulk_pricing: Optional[Union[List[dict], str]] = None
 
 class AssistantRequest(BaseModel):
     query: str
@@ -111,6 +125,50 @@ class ProfileUpdateRequest(BaseModel):
     location: Optional[str] = None
     profile_picture: Optional[str] = None
 
+class BuyerRegisterRequest(BaseModel):
+    organization_name: str
+    contact_person: Optional[str] = ""
+    username: str
+    password: str
+    phone: Optional[str] = ""
+    contact_email: Optional[str] = ""
+    buyer_type: Optional[str] = "Corporate Wholesale Buyer"
+    location: Optional[str] = "India"
+    target_category: Optional[str] = "Handicrafts & Handloom"
+    min_order_qty: Optional[int] = 25
+
+class BuyerLoginRequest(BaseModel):
+    username: str
+    password: str
+
+class EnquiryCreate(BaseModel):
+    product_id: int
+    buyer_id: Optional[int] = 0
+    buyer_name: Optional[str] = "Business Buyer"
+    business_name: Optional[str] = ""
+    buyer_type: Optional[str] = "Wholesale Buyer"
+    buyer_phone: Optional[str] = ""
+    buyer_email: Optional[str] = ""
+    buyer_location: Optional[str] = "India"
+    order_quantity: Optional[int] = 50
+    quantity: Optional[int] = None
+    offer_price: Optional[float] = 0.0
+    target_price: Optional[float] = 0.0
+    target_unit_price: Optional[float] = None
+    estimated_total: Optional[float] = None
+    custom_size: Optional[bool] = False
+    custom_design: Optional[bool] = False
+    custom_packaging: Optional[bool] = False
+    custom_notes: Optional[str] = ""
+    notes: Optional[str] = ""
+    message: Optional[str] = ""
+    product_title: Optional[str] = ""
+    artisan_id: Optional[int] = 1
+    artisan_username: Optional[str] = "ramesh_artisan"
+
+class EnquiryStatusUpdate(BaseModel):
+    status: Optional[str] = None
+
 
 # --- Routes ---
 
@@ -118,12 +176,13 @@ class ProfileUpdateRequest(BaseModel):
 def root():
     return {
         "status": "online",
-        "app": "Hastakala AI Business Manager Backend",
+        "app": "Hastakala AI Business Manager & B2B Marketplace Backend",
         "database": get_db_info(),
-        "version": "1.0.0",
+        "version": "1.1.0",
         "documentation": "/docs"
     }
 
+# Artisan Auth
 @app.post("/api/auth/register")
 def register_artisan_endpoint(req: RegisterRequest):
     try:
@@ -150,6 +209,24 @@ def update_artisan_profile_endpoint(req: ProfileUpdateRequest):
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to update profile: {str(e)}")
+
+# Buyer Auth
+@app.post("/api/auth/buyer/register")
+def register_buyer_endpoint(req: BuyerRegisterRequest):
+    try:
+        buyer = db_register_buyer(req.model_dump())
+        return {"status": "success", "buyer": buyer, "message": "Buyer account registered successfully!"}
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Buyer registration failed: {str(e)}")
+
+@app.post("/api/auth/buyer/login")
+def login_buyer_endpoint(req: BuyerLoginRequest):
+    buyer = db_login_buyer(req.username, req.password)
+    if not buyer:
+        raise HTTPException(status_code=401, detail="Invalid buyer username or password.")
+    return {"status": "success", "buyer": buyer, "message": "Buyer login successful!"}
 
 @app.get("/api/database/status")
 def database_status():
@@ -200,7 +277,8 @@ def generate_catalog_endpoint(req: CatalogRequest):
     result = generate_catalog_from_voice_or_text(
         voice_text=req.voice_text,
         language=req.language,
-        image_url=req.image_url or ""
+        image_url=req.image_url or "",
+        image_base64=req.image_base64 or ""
     )
     return result
 
@@ -229,9 +307,16 @@ def calculate_pricing_endpoint(req: PricingRequest):
 @app.get("/api/products")
 def get_products(
     artisan_id: Optional[int] = Query(None),
-    artisan_username: Optional[str] = Query(None)
+    artisan_username: Optional[str] = Query(None),
+    category: Optional[str] = Query(None),
+    search: Optional[str] = Query(None)
 ):
-    return db_get_all_products(artisan_id=artisan_id, artisan_username=artisan_username)
+    return db_get_all_products(
+        artisan_id=artisan_id,
+        artisan_username=artisan_username,
+        category=category,
+        search=search
+    )
 
 @app.post("/api/products")
 def create_product(product: ProductCreate):
@@ -258,11 +343,53 @@ def chat_assistant_endpoint(req: AssistantRequest):
 
 @app.get("/api/buyers")
 def list_buyers(category: Optional[str] = Query(None)):
-    return get_verified_buyers(category_filter=category or "")
+    return db_get_verified_buyers(category_filter=category or "")
 
+# B2B Enquiries API (Heart of Marketplace)
 @app.get("/api/enquiries")
-def list_enquiries(product_id: Optional[int] = Query(None)):
-    return get_product_enquiries(product_id=product_id)
+def list_enquiries(
+    product_id: Optional[int] = Query(None),
+    artisan_id: Optional[int] = Query(None),
+    artisan_username: Optional[str] = Query(None),
+    buyer_id: Optional[int] = Query(None),
+    buyer_name: Optional[str] = Query(None)
+):
+    return db_get_product_enquiries(
+        product_id=product_id,
+        artisan_id=artisan_id,
+        artisan_username=artisan_username,
+        buyer_id=buyer_id,
+        buyer_name=buyer_name
+    )
+
+@app.post("/api/enquiries")
+def create_enquiry_endpoint(req: EnquiryCreate):
+    enquiry = db_create_enquiry(req.model_dump())
+    return {
+        "status": "success",
+        "enquiry_id": enquiry["id"],
+        "enquiry": enquiry,
+        "message": "Enquiry submitted successfully! Artisan has been notified and will contact you directly."
+    }
+
+@app.patch("/api/enquiries/{enquiry_id}/status")
+def update_enquiry_status_endpoint(
+    enquiry_id: int,
+    req: Optional[EnquiryStatusUpdate] = None,
+    status: Optional[str] = Query(None)
+):
+    new_status = (req.status if req and req.status else status) or "In Discussion"
+    success = db_update_enquiry_status(enquiry_id, new_status)
+    if not success:
+        raise HTTPException(status_code=404, detail="Enquiry not found or status update failed")
+    return {"status": "success", "message": f"Status updated to '{new_status}'"}
+
+@app.get("/api/recommendations")
+def get_recommendations_endpoint(
+    category: Optional[str] = Query(None),
+    limit: Optional[int] = Query(4)
+):
+    return db_get_ai_recommendations(category=category, limit=limit or 4)
 
 @app.get("/api/orders")
 def get_due_orders(
@@ -274,4 +401,3 @@ def get_due_orders(
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("hastakala_backend.main:app", host=HOST, port=PORT, reload=True)
-

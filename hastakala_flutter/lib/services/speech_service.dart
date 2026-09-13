@@ -1,20 +1,6 @@
 import 'package:flutter/foundation.dart';
-import 'dart:js_interop' as js;
-
-@js.JS('HastakalaSpeech.startListening')
-external bool _startListeningJS(js.JSString langCode);
-
-@js.JS('HastakalaSpeech.stopListening')
-external void _stopListeningJS();
-
-@js.JS('window.onHastakalaSpeechResult')
-external set _onHastakalaSpeechResult(js.JSFunction? fn);
-
-@js.JS('window.onHastakalaSpeechEnd')
-external set _onHastakalaSpeechEnd(js.JSFunction? fn);
-
-@js.JS('window.onHastakalaSpeechError')
-external set _onHastakalaSpeechError(js.JSFunction? fn);
+import 'speech_service_stub.dart'
+    if (dart.library.js_interop) 'speech_service_web.dart' as impl;
 
 class SpeechService {
   static bool isAvailable() {
@@ -31,33 +17,17 @@ class SpeechService {
       onError("Native speech recognition requires web browser microphone permissions.");
       return false;
     }
-
-    try {
-      // Register callbacks
-      _onHastakalaSpeechResult = (js.JSString result) {
-        onResult(result.toDart);
-      }.toJS;
-
-      _onHastakalaSpeechEnd = () {
-        onEnd();
-      }.toJS;
-
-      _onHastakalaSpeechError = (js.JSString err) {
-        onError(err.toDart);
-      }.toJS;
-
-      return _startListeningJS(languageCode.toJS);
-    } catch (e) {
-      onError('Speech initialization failed: $e');
-      return false;
-    }
+    return impl.startSpeechListening(
+      languageCode: languageCode,
+      onResult: onResult,
+      onEnd: onEnd,
+      onError: onError,
+    );
   }
 
   static void stopListening() {
     if (kIsWeb) {
-      try {
-        _stopListeningJS();
-      } catch (_) {}
+      impl.stopSpeechListening();
     }
   }
 }
