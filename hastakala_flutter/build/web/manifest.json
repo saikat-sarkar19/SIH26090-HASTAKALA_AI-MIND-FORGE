@@ -1,23 +1,25 @@
 {
-    "name": "hastakala",
-    "short_name": "hastakala",
+    "name": "Hastakala - Traditional Indian Crafts",
+    "short_name": "Hastakala",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#FFF8F0",
+    "theme_color": "#7A0B2E",
+    "description": "AI-Powered Business Manager & B2B Marketplace for Traditional Indian Artisans",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
         {
             "src": "icons/Icon-192.png",
             "sizes": "192x192",
-            "type": "image/png"
+            "type": "image/png",
+            "purpose": "any"
         },
         {
             "src": "icons/Icon-512.png",
             "sizes": "512x512",
-            "type": "image/png"
+            "type": "image/png",
+            "purpose": "any"
         },
         {
             "src": "icons/Icon-maskable-192.png",

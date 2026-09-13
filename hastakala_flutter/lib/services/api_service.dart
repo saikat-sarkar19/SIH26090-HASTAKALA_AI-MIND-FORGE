@@ -3,6 +3,9 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 class ApiService {
+  // Live Vercel Production Server URL
+  static const String liveVercelUrl = 'https://sih-26090-hastakala-ai-mind-forge-8.vercel.app';
+
   // Base URL configuration for different environments
   static String get baseUrl {
     if (kIsWeb) {
@@ -13,10 +16,8 @@ class ApiService {
       final host = Uri.base.host.isNotEmpty ? Uri.base.host : '127.0.0.1';
       return 'http://$host:8000';
     }
-    if (defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:8000';
-    }
-    return 'http://127.0.0.1:8000';
+    // Mobile Android / iOS App connects to live Vercel Cloud Backend
+    return liveVercelUrl;
   }
 
   // Check connection status
