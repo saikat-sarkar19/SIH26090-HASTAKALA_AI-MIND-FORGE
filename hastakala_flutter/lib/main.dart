@@ -948,12 +948,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
 }
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final int initialIndex;
+  const HomeScreen({super.key, this.initialIndex = 0});
   @override State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int index = 0;
+  late int index;
+
+  @override
+  void initState() {
+    super.initState();
+    index = widget.initialIndex;
+  }
 
   void _navigateToTab(int tabIndex) {
     setState(() {
@@ -2877,7 +2884,14 @@ class PublishedPage extends StatelessWidget {
         const SizedBox(height: 10),
         const Text('Your product is now listed and available to GeM & B2B buyers across India.', textAlign: TextAlign.center, style: TextStyle(color: AppColors.muted)),
         const SizedBox(height: 34),
-        AppButton(text: 'Return to Dashboard', onPressed: () => Navigator.popUntil(context, (r) => r.isFirst)),
+        AppButton(
+          text: 'Return to Dashboard',
+          onPressed: () => Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (_) => const HomeScreen(initialIndex: 0)),
+            (route) => false,
+          ),
+        ),
       ]),
     )),
   );
