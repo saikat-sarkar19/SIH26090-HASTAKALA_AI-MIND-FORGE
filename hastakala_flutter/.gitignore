@@ -47,3 +47,9 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Local databases and uploads
+hastakala_backend/*.db
+hastakala_backend/uploads/*
+!hastakala_backend/uploads/.gitkeep
+
