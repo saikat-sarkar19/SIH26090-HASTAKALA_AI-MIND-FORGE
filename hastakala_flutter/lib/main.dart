@@ -654,11 +654,36 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final TextEditingController passwordCtrl = TextEditingController();
   final TextEditingController confirmPasswordCtrl = TextEditingController();
 
+  final FocusNode fullNameFocusNode = FocusNode();
+  final FocusNode usernameFocusNode = FocusNode();
+  final FocusNode phoneFocusNode = FocusNode();
+  final FocusNode addressFocusNode = FocusNode();
+  final FocusNode passwordFocusNode = FocusNode();
+  final FocusNode confirmPasswordFocusNode = FocusNode();
+
   String selectedGender = 'Male';
   String selectedCraft = 'Handloom Weaving & Textiles';
   bool obscurePassword = true;
   bool obscureConfirmPassword = true;
   bool loading = false;
+
+  @override
+  void dispose() {
+    fullNameCtrl.dispose();
+    usernameCtrl.dispose();
+    phoneCtrl.dispose();
+    addressCtrl.dispose();
+    passwordCtrl.dispose();
+    confirmPasswordCtrl.dispose();
+
+    fullNameFocusNode.dispose();
+    usernameFocusNode.dispose();
+    phoneFocusNode.dispose();
+    addressFocusNode.dispose();
+    passwordFocusNode.dispose();
+    confirmPasswordFocusNode.dispose();
+    super.dispose();
+  }
 
   final List<String> craftOptions = [
     'Handloom Weaving & Textiles',
@@ -758,186 +783,216 @@ class _RegisterScreenState extends State<RegisterScreen> {
               borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
             ),
             child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Create Your Account', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.wine)),
-                  const SizedBox(height: 4),
-                  const Text('Join the global digital network of traditional Indian artisans', style: TextStyle(color: AppColors.muted, fontSize: 12)),
-                  const SizedBox(height: 20),
+              child: AutofillGroup(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Create Your Account', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.wine)),
+                    const SizedBox(height: 4),
+                    const Text('Join the global digital network of traditional Indian artisans', style: TextStyle(color: AppColors.muted, fontSize: 12)),
+                    const SizedBox(height: 20),
 
-                  const Text('Full Name *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.wine)),
-                  const SizedBox(height: 4),
-                  TextField(
-                    controller: fullNameCtrl,
-                    decoration: InputDecoration(
-                      prefixIcon: const Icon(Icons.badge_outlined, color: AppColors.wine),
-                      hintText: 'e.g. Ramesh Kumar',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    const Text('Full Name *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.wine)),
+                    const SizedBox(height: 4),
+                    TextField(
+                      controller: fullNameCtrl,
+                      focusNode: fullNameFocusNode,
+                      textInputAction: TextInputAction.next,
+                      onTap: () => fullNameFocusNode.requestFocus(),
+                      decoration: InputDecoration(
+                        prefixIcon: const Icon(Icons.badge_outlined, color: AppColors.wine),
+                        hintText: 'e.g. Ramesh Kumar',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 14),
+                    const SizedBox(height: 14),
 
-                  const Text('Username *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.wine)),
-                  const SizedBox(height: 4),
-                  TextField(
-                    controller: usernameCtrl,
-                    decoration: InputDecoration(
-                      prefixIcon: const Icon(Icons.alternate_email, color: AppColors.wine),
-                      hintText: 'e.g. ramesh_artisan',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    const Text('Username *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.wine)),
+                    const SizedBox(height: 4),
+                    TextField(
+                      controller: usernameCtrl,
+                      focusNode: usernameFocusNode,
+                      textInputAction: TextInputAction.next,
+                      onTap: () => usernameFocusNode.requestFocus(),
+                      decoration: InputDecoration(
+                        prefixIcon: const Icon(Icons.alternate_email, color: AppColors.wine),
+                        hintText: 'e.g. ramesh_artisan',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 14),
+                    const SizedBox(height: 14),
 
-                  const Text('Phone Number *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.wine)),
-                  const SizedBox(height: 4),
-                  TextField(
-                    controller: phoneCtrl,
-                    keyboardType: TextInputType.phone,
-                    decoration: InputDecoration(
-                      prefixIcon: const Icon(Icons.phone_outlined, color: AppColors.wine),
-                      hintText: 'e.g. 9876543210',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    const Text('Phone Number *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.wine)),
+                    const SizedBox(height: 4),
+                    TextField(
+                      controller: phoneCtrl,
+                      focusNode: phoneFocusNode,
+                      textInputAction: TextInputAction.next,
+                      keyboardType: TextInputType.phone,
+                      onTap: () => phoneFocusNode.requestFocus(),
+                      decoration: InputDecoration(
+                        prefixIcon: const Icon(Icons.phone_outlined, color: AppColors.wine),
+                        hintText: 'e.g. 9876543210',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 14),
+                    const SizedBox(height: 14),
 
-                  const Text('Gender *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.wine)),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: ['Male', 'Female', 'Other'].map((g) {
-                      final isSelected = selectedGender == g;
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 10),
-                        child: ChoiceChip(
-                          label: Text(g == 'Male' ? '👨 Male' : (g == 'Female' ? '👩 Female' : '🧑 Other')),
-                          selected: isSelected,
-                          selectedColor: AppColors.wine,
-                          backgroundColor: Colors.white,
-                          labelStyle: TextStyle(
-                            color: isSelected ? Colors.white : AppColors.wine,
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                            fontSize: 12,
+                    const Text('Gender *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.wine)),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: ['Male', 'Female', 'Other'].map((g) {
+                        final isSelected = selectedGender == g;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 10),
+                          child: ChoiceChip(
+                            label: Text(g == 'Male' ? '👨 Male' : (g == 'Female' ? '👩 Female' : '🧑 Other')),
+                            selected: isSelected,
+                            selectedColor: AppColors.wine,
+                            backgroundColor: Colors.white,
+                            labelStyle: TextStyle(
+                              color: isSelected ? Colors.white : AppColors.wine,
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              fontSize: 12,
+                            ),
+                            onSelected: (bool sel) {
+                              if (sel) setState(() => selectedGender = g);
+                            },
                           ),
-                          onSelected: (bool sel) {
-                            if (sel) setState(() => selectedGender = g);
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 14),
+
+                    const Text('Craft Specialty / Category *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.wine)),
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: Colors.grey.shade400),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: selectedCraft,
+                          isExpanded: true,
+                          icon: const Icon(Icons.arrow_drop_down, color: AppColors.wine),
+                          items: craftOptions.map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 13)))).toList(),
+                          onChanged: (val) {
+                            if (val != null) setState(() => selectedCraft = val);
                           },
                         ),
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 14),
-
-                  const Text('Craft Specialty / Category *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.wine)),
-                  const SizedBox(height: 4),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: Colors.grey.shade400),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: selectedCraft,
-                        isExpanded: true,
-                        icon: const Icon(Icons.arrow_drop_down, color: AppColors.wine),
-                        items: craftOptions.map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 13)))).toList(),
-                        onChanged: (val) {
-                          if (val != null) setState(() => selectedCraft = val);
-                        },
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 14),
+                    const SizedBox(height: 14),
 
-                  const Text('Address / Location *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.wine)),
-                  const SizedBox(height: 4),
-                  TextField(
-                    controller: addressCtrl,
-                    decoration: InputDecoration(
-                      prefixIcon: const Icon(Icons.location_on_outlined, color: AppColors.wine),
-                      hintText: 'e.g. Varanasi, Uttar Pradesh',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    const Text('Address / Location *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.wine)),
+                    const SizedBox(height: 4),
+                    TextField(
+                      controller: addressCtrl,
+                      focusNode: addressFocusNode,
+                      textInputAction: TextInputAction.next,
+                      onTap: () => addressFocusNode.requestFocus(),
+                      decoration: InputDecoration(
+                        prefixIcon: const Icon(Icons.location_on_outlined, color: AppColors.wine),
+                        hintText: 'e.g. Varanasi, Uttar Pradesh',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 14),
+                    const SizedBox(height: 14),
 
-                  const Text('Create Password *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.wine)),
-                  const SizedBox(height: 4),
-                  TextField(
-                    controller: passwordCtrl,
-                    obscureText: obscurePassword,
-                    decoration: InputDecoration(
-                      prefixIcon: const Icon(Icons.lock_outlined, color: AppColors.wine),
-                      suffixIcon: IconButton(
-                        icon: Icon(obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined, color: AppColors.muted),
-                        onPressed: () => setState(() => obscurePassword = !obscurePassword),
-                      ),
-                      hintText: '••••••••',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-
-                  const Text('Confirm Password *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.wine)),
-                  const SizedBox(height: 4),
-                  TextField(
-                    controller: confirmPasswordCtrl,
-                    obscureText: obscureConfirmPassword,
-                    decoration: InputDecoration(
-                      prefixIcon: const Icon(Icons.lock_clock_outlined, color: AppColors.wine),
-                      suffixIcon: IconButton(
-                        icon: Icon(obscureConfirmPassword ? Icons.visibility_outlined : Icons.visibility_off_outlined, color: AppColors.muted),
-                        onPressed: () => setState(() => obscureConfirmPassword = !obscureConfirmPassword),
-                      ),
-                      hintText: 'Re-enter password',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    ),
-                  ),
-                  const SizedBox(height: 22),
-
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: ElevatedButton(
-                      onPressed: loading ? null : _handleRegister,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.wine,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      ),
-                      child: loading
-                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                          : const Text('Register Account ✨', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                      ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  Center(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Text('Already have an account? ', style: TextStyle(color: AppColors.muted, fontSize: 13)),
-                        GestureDetector(
-                          onTap: () => Navigator.pop(context),
-                          child: const Text(
-                            'Sign In',
-                            style: TextStyle(color: AppColors.wine, fontWeight: FontWeight.bold, fontSize: 13, decoration: TextDecoration.underline),
-                          ),
+                    const Text('Create Password *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.wine)),
+                    const SizedBox(height: 4),
+                    TextField(
+                      controller: passwordCtrl,
+                      focusNode: passwordFocusNode,
+                      textInputAction: TextInputAction.next,
+                      obscureText: obscurePassword,
+                      enableInteractiveSelection: true,
+                      autofillHints: const [AutofillHints.newPassword],
+                      onTap: () => passwordFocusNode.requestFocus(),
+                      decoration: InputDecoration(
+                        prefixIcon: const Icon(Icons.lock_outlined, color: AppColors.wine),
+                        suffixIcon: IconButton(
+                          icon: Icon(obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined, color: AppColors.muted),
+                          onPressed: () {
+                            setState(() => obscurePassword = !obscurePassword);
+                            passwordFocusNode.requestFocus();
+                          },
                         ),
-                      ],
+                        hintText: '••••••••',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                ],
+                    const SizedBox(height: 14),
+
+                    const Text('Confirm Password *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.wine)),
+                    const SizedBox(height: 4),
+                    TextField(
+                      controller: confirmPasswordCtrl,
+                      focusNode: confirmPasswordFocusNode,
+                      textInputAction: TextInputAction.done,
+                      obscureText: obscureConfirmPassword,
+                      enableInteractiveSelection: true,
+                      autofillHints: const [AutofillHints.password],
+                      onTap: () => confirmPasswordFocusNode.requestFocus(),
+                      decoration: InputDecoration(
+                        prefixIcon: const Icon(Icons.lock_clock_outlined, color: AppColors.wine),
+                        suffixIcon: IconButton(
+                          icon: Icon(obscureConfirmPassword ? Icons.visibility_outlined : Icons.visibility_off_outlined, color: AppColors.muted),
+                          onPressed: () {
+                            setState(() => obscureConfirmPassword = !obscureConfirmPassword);
+                            confirmPasswordFocusNode.requestFocus();
+                          },
+                        ),
+                        hintText: 'Re-enter password',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      ),
+                    ),
+                    const SizedBox(height: 22),
+
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: ElevatedButton(
+                        onPressed: loading ? null : _handleRegister,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.wine,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                        child: loading
+                            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                            : const Text('Register Account ✨', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    Center(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Text('Already have an account? ', style: TextStyle(color: AppColors.muted, fontSize: 13)),
+                          GestureDetector(
+                            onTap: () => Navigator.pop(context),
+                            child: const Text(
+                              'Sign In',
+                              style: TextStyle(color: AppColors.wine, fontWeight: FontWeight.bold, fontSize: 13, decoration: TextDecoration.underline),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                ),
               ),
             ),
           ),
