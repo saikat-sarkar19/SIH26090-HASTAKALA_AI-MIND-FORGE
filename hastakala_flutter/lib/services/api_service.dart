@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 class ApiService {
@@ -282,6 +283,97 @@ class ApiService {
       relativePath = '/$relativePath';
     }
     return '$baseUrl$relativePath';
+  }
+
+  // Show Fullscreen Image Preview Modal with Close (X) button at top-right
+  static void showImagePreviewDialog(BuildContext context, String? rawImageUrl) {
+    if (rawImageUrl == null || rawImageUrl.isEmpty) return;
+    final fullUrl = getFullImageUrl(rawImageUrl);
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogCtx) => Dialog(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        child: Stack(
+          alignment: Alignment.center,
+          clipBehavior: Clip.none,
+          children: [
+            // Enlarged Image Container with Rounded Corners & Shadow
+            Container(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(dialogCtx).size.height * 0.78,
+                maxWidth: MediaQuery.of(dialogCtx).size.width * 0.92,
+              ),
+              decoration: BoxDecoration(
+                color: Colors.black,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: const [
+                  BoxShadow(color: Colors.black54, blurRadius: 20, spreadRadius: 4),
+                ],
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: InteractiveViewer(
+                panEnabled: true,
+                minScale: 0.8,
+                maxScale: 4.0,
+                child: Image.network(
+                  fullUrl,
+                  fit: BoxFit.contain,
+                  loadingBuilder: (c, child, progress) {
+                    if (progress == null) return child;
+                    return Container(
+                      height: 280,
+                      width: double.infinity,
+                      color: Colors.black87,
+                      child: const Center(
+                        child: CircularProgressIndicator(color: Color(0xFFD8A54A)),
+                      ),
+                    );
+                  },
+                  errorBuilder: (c, e, s) => Container(
+                    padding: const EdgeInsets.all(32),
+                    color: Colors.black87,
+                    child: const Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.broken_image_outlined, size: 64, color: Colors.white60),
+                        SizedBox(height: 12),
+                        Text(
+                          'Unable to load image preview',
+                          style: TextStyle(color: Colors.white70, fontSize: 13),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            // Top Right Close (X) Button
+            Positioned(
+              top: -12,
+              right: -12,
+              child: Material(
+                color: const Color(0xFF7A0B2E),
+                shape: const CircleBorder(),
+                elevation: 6,
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: () => Navigator.of(dialogCtx).pop(),
+                  child: const Padding(
+                    padding: EdgeInsets.all(8),
+                    child: Icon(Icons.close, color: Colors.white, size: 22),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   // --- Artisan Auth APIs ---

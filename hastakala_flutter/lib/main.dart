@@ -3828,20 +3828,47 @@ class _ProductsPageState extends State<ProductsPage> {
                 ),
               ),
               if ((p['enhanced_image_url'] ?? p['raw_image_url'] ?? '').toString().isNotEmpty)
-                Container(
-                  height: 220,
-                  clipBehavior: Clip.antiAlias,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: AppColors.gold, width: 1.5),
-                  ),
-                  child: Image.network(
-                    ApiService.getFullImageUrl(p['enhanced_image_url'] ?? p['raw_image_url']),
-                    fit: BoxFit.cover,
-                    errorBuilder: (c, e, s) => Container(
-                      color: const Color(0xFFE9DED3),
-                      child: const Icon(Icons.image_outlined, size: 60, color: AppColors.wine),
-                    ),
+                GestureDetector(
+                  onTap: () => ApiService.showImagePreviewDialog(parentCtx, p['enhanced_image_url'] ?? p['raw_image_url']),
+                  child: Stack(
+                    children: [
+                      Container(
+                        height: 220,
+                        width: double.infinity,
+                        clipBehavior: Clip.antiAlias,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: AppColors.gold, width: 1.5),
+                        ),
+                        child: Image.network(
+                          ApiService.getFullImageUrl(p['enhanced_image_url'] ?? p['raw_image_url']),
+                          fit: BoxFit.cover,
+                          errorBuilder: (c, e, s) => Container(
+                            color: const Color(0xFFE9DED3),
+                            child: const Icon(Icons.image_outlined, size: 60, color: AppColors.wine),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        bottom: 8,
+                        right: 8,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.7),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.zoom_in, color: Colors.white, size: 14),
+                              SizedBox(width: 4),
+                              Text('Tap to Preview', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               const SizedBox(height: 16),

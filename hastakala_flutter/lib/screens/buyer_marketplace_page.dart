@@ -153,10 +153,13 @@ class _BuyerMarketplacePageState extends State<BuyerMarketplacePage> {
                         fit: StackFit.expand,
                         children: [
                           if ((p['enhanced_image_url'] ?? p['raw_image_url'] ?? '').toString().isNotEmpty)
-                            Image.network(
-                              ApiService.getFullImageUrl(p['enhanced_image_url'] ?? p['raw_image_url']),
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => _imagePlaceholder(),
+                            GestureDetector(
+                              onTap: () => ApiService.showImagePreviewDialog(context, p['enhanced_image_url'] ?? p['raw_image_url']),
+                              child: Image.network(
+                                ApiService.getFullImageUrl(p['enhanced_image_url'] ?? p['raw_image_url']),
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => _imagePlaceholder(),
+                              ),
                             )
                           else
                             _imagePlaceholder(),
