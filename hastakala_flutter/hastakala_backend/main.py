@@ -174,6 +174,9 @@ class EnquiryStatusUpdate(BaseModel):
 # --- Routes ---
 
 @app.get("/")
+@app.get("/api")
+@app.get("/api/")
+@app.get("/api/index.py")
 def root():
     return {
         "status": "online",
