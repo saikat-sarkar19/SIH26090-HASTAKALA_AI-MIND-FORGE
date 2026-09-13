@@ -234,6 +234,79 @@ class TestHastakalaBackend(unittest.TestCase):
             self.client.delete(f"/api/products/{id_a}")
             self.client.delete(f"/api/products/{id_b}")
 
+    def test_buyer_auth(self):
+        import time
+        # Login demo buyer
+        res_login = self.client.post("/api/auth/buyer/login", json={"username": "fabindia_buyer", "password": "password123"})
+        self.assertEqual(res_login.status_code, 200)
+        self.assertEqual(res_login.json()["status"], "success")
+        self.assertEqual(res_login.json()["buyer"]["organization_name"], "FabIndia B2B Procurement")
+
+        # Register new buyer
+        ts = int(time.time() * 1000)
+        b_username = f"buyer_{ts}"
+        new_buyer = {
+            "organization_name": f"Global Crafts Ltd {ts}",
+            "contact_person": "Aditi Sharma",
+            "contact_email": f"aditi_{ts}@crafts.com",
+            "phone": "+91 9123456780",
+            "buyer_type": "Exporter",
+            "location": "New Delhi, Delhi",
+            "username": b_username,
+            "password": "securepassword123"
+        }
+        res_reg = self.client.post("/api/auth/buyer/register", json=new_buyer)
+        self.assertEqual(res_reg.status_code, 200)
+        self.assertEqual(res_reg.json()["status"], "success")
+
+        # Login new buyer
+        res_log2 = self.client.post("/api/auth/buyer/login", json={"username": b_username, "password": "securepassword123"})
+        self.assertEqual(res_log2.status_code, 200)
+        self.assertEqual(res_log2.json()["buyer"]["contact_person"], "Aditi Sharma")
+
+    def test_b2b_enquiries_and_recommendations(self):
+        # 1. Create B2B Enquiry
+        enquiry_payload = {
+            "product_id": 1,
+            "product_title": "Handmade Bamboo Fruit Basket",
+            "buyer_name": "FabIndia B2B Procurement",
+            "contact_person": "Sunita Verma",
+            "buyer_phone": "+91 98200 11223",
+            "buyer_email": "b2b@fabindia.com",
+            "buyer_location": "Mumbai, Maharashtra",
+            "buyer_type": "Corporate Wholesale Buyer",
+            "quantity": 100,
+            "target_unit_price": 400.0,
+            "estimated_total": 40000.0,
+            "custom_size": True,
+            "custom_design": True,
+            "custom_packaging": False,
+            "notes": "Need custom logo tags and export packaging.",
+            "artisan_id": 1
+        }
+        res_enq = self.client.post("/api/enquiries", json=enquiry_payload)
+        self.assertEqual(res_enq.status_code, 200)
+        enq_data = res_enq.json()
+        self.assertIn("enquiry_id", enq_data)
+        enq_id = enq_data["enquiry_id"]
+
+        # 2. Query enquiries as Artisan
+        res_art_enqs = self.client.get("/api/enquiries?artisan_id=1")
+        self.assertEqual(res_art_enqs.status_code, 200)
+        enquiries = res_art_enqs.json()
+        self.assertTrue(any(e["id"] == enq_id for e in enquiries))
+
+        # 3. Update status (e.g. quote_sent)
+        res_status = self.client.patch(f"/api/enquiries/{enq_id}/status?status=quote_sent")
+        self.assertEqual(res_status.status_code, 200)
+
+        # 4. Check AI recommendations
+        res_rec = self.client.get("/api/recommendations")
+        self.assertEqual(res_rec.status_code, 200)
+        recs = res_rec.json()
+        self.assertIsInstance(recs, list)
+        self.assertTrue(len(recs) > 0)
+
 if __name__ == "__main__":
     unittest.main()
 

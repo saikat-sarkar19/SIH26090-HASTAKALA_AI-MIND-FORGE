@@ -26,12 +26,13 @@ except Exception:
     pass
 
 # MongoDB Database Configuration
-MONGODB_URI = os.getenv("MONGODB_URI", "mongodb+srv://pinturay2010_db_user:jgIBYlgVRdIRuS8W@cluster0.d7y3jzy.mongodb.net/hastakala_db?retryWrites=true&w=majority")
+MONGODB_URI = os.getenv("MONGODB_URI", "mongodb+srv://pinturay2010_db_user:jgIBYlgVRdIRuS8W@cluster0.d7y3jzy.mongodb.net/hastakala_db?retryWrites=true&w=majority&appName=Cluster0")
 MONGODB_DB_NAME = os.getenv("MONGODB_DB_NAME", "hastakala_db")
 
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "AQ.Ab8RN6JceOZYN62DyoZidXBQfWNY8dSHbZ_jLHOBN5Wfzkuj0w")
-PHOTOROOM_API_KEY = os.getenv("PHOTOROOM_API_KEY", "sk_pr_default_5d473f437eaf270cf71ab63fa1dfdb58a74c877c")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "AQ.Ab8RN6LSa0bLqHsax2_KqnxBGQ_uX8lfksj4LMgbtCyLyUo9vw")
+PHOTOROOM_API_KEY = os.getenv("PHOTOROOM_API_KEY", "sandbox_sk_pr_default_1d1f867fc8626c9c4639838a4178f762219c4f9c")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 
 HOST = "0.0.0.0"
 PORT = 8000

@@ -5,7 +5,7 @@ import urllib.parse
 import base64
 import requests
 from pathlib import Path
-from hastakala_backend.config import GEMINI_API_KEY, BASE_DIR, UPLOAD_DIR, ENHANCED_DIR
+from hastakala_backend.config import GEMINI_API_KEY, BASE_DIR, UPLOAD_DIR, ENHANCED_DIR, GEMINI_MODEL
 
 LANG_MAP = {
     'hi': 'Hindi (हिंदी)',
@@ -267,8 +267,9 @@ def build_high_quality_english_description(keywords: str, translated_en: str, de
         materials = matched['materials']
         tags = matched['tags']
     else:
-        clean_name = re.sub(r'[^\w\s]', '', raw_text).title()
-        title = f"Handcrafted {found_color.title() + ' ' if found_color else ''}{clean_name}"
+        clean_name = re.sub(r'[^\w\s]', '', raw_text).title().strip()
+        item_label = clean_name if clean_name else "Artisan Product"
+        title = f"Handcrafted {found_color.title() + ' ' if found_color else ''}{item_label}"
         desc_en = (
             f"Beautifully handcrafted by master Indian artisans, this bespoke creation showcases traditional craftsmanship and natural eco-friendly materials. "
             f"Featuring exceptional detail, rich texture, and a refined {found_color or 'artisanal'} aesthetic, it reflects India's vibrant cultural heritage. "
@@ -286,54 +287,88 @@ def build_high_quality_english_description(keywords: str, translated_en: str, de
         "tags": tags
     }
 
-def generate_with_gemini(keywords: str, translated_en: str, image_url: str = "", image_bytes: bytes = None, target_lang: str = "Hindi") -> dict:
+def generate_with_gemini(
+    keywords: str,
+    translated_en: str,
+    image_url: str = "",
+    image_bytes: bytes = None,
+    image_base64: str = "",
+    target_lang: str = "Hindi"
+) -> dict:
     """
-    Multimodal Gemini AI Generator:
-    Analyzes BOTH product photo and artisan voice description/keywords
-    to generate ultra-accurate e-commerce titles, SEO descriptions in English, categories, materials, and tags.
+    Multimodal Gemini 3.8 Flash AI Generator:
+    Analyzes BOTH product photo (via visual image bytes/url) and artisan voice description/keywords
+    to generate high-converting e-commerce titles, SEO descriptions in English, exact type of art/craft,
+    marketplace category, materials, and tags.
     """
-    api_key = GEMINI_API_KEY or "AQ.Ab8RN6JceOZYN62DyoZidXBQfWNY8dSHbZ_jLHOBN5Wfzkuj0w"
+    api_key = GEMINI_API_KEY or "AQ.Ab8RN6LSa0bLqHsax2_KqnxBGQ_uX8lfksj4LMgbtCyLyUo9vw"
 
     try:
         parts = []
 
-        # Load image if provided
+        # Load image if provided (base64, bytes, or url)
         img_b64 = None
-        mime_type = "image/png"
-        if image_bytes:
-            img_b64 = base64.b64encode(image_bytes).decode("utf-8")
+        raw_img_data = None
+
+        if image_base64:
+            clean_b64 = image_base64
+            if "base64," in clean_b64:
+                clean_b64 = clean_b64.split("base64,")[1]
+            try:
+                raw_img_data = base64.b64decode(clean_b64)
+            except Exception:
+                pass
+        elif image_bytes:
+            raw_img_data = image_bytes
         elif image_url:
             clean_rel = image_url.split("?")[0].lstrip("/")
-            local_file = BASE_DIR / clean_rel
-            if not local_file.exists():
-                fname = os.path.basename(clean_rel)
-                if (ENHANCED_DIR / fname).exists():
-                    local_file = ENHANCED_DIR / fname
-                elif (UPLOAD_DIR / fname).exists():
-                    local_file = UPLOAD_DIR / fname
+            fname = os.path.basename(clean_rel)
+            local_file = None
+            if (ENHANCED_DIR / fname).exists():
+                local_file = ENHANCED_DIR / fname
+            elif (UPLOAD_DIR / fname).exists():
+                local_file = UPLOAD_DIR / fname
+            elif (BASE_DIR / clean_rel).exists():
+                local_file = BASE_DIR / clean_rel
 
-            if local_file.exists():
+            if local_file and local_file.exists():
                 with open(local_file, "rb") as f:
-                    img_data = f.read()
-                    img_b64 = base64.b64encode(img_data).decode("utf-8")
-                    if local_file.suffix.lower() in [".jpg", ".jpeg"]:
-                        mime_type = "image/jpeg"
-                    elif local_file.suffix.lower() == ".webp":
-                        mime_type = "image/webp"
+                    raw_img_data = f.read()
 
-        if img_b64:
-            parts.append({"inlineData": {"mimeType": mime_type, "data": img_b64}})
+        # Convert and resize to fast 512x512 JPEG for lightning-fast Gemini 3.8 Flash inference
+        if raw_img_data:
+            try:
+                from PIL import Image
+                from io import BytesIO
+                pil_img = Image.open(BytesIO(raw_img_data)).convert("RGB")
+                pil_img.thumbnail((512, 512), Image.Resampling.LANCZOS)
+                buf = BytesIO()
+                pil_img.save(buf, format="JPEG", quality=85)
+                img_b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
+                parts.append({"inlineData": {"mimeType": "image/jpeg", "data": img_b64}})
+            except Exception as e:
+                print(f"Error optimizing image for Gemini: {e}")
 
-        prompt = f"""
-You are an expert AI business cataloger and senior e-commerce copywriter for Hastakala - an e-commerce platform for Indian traditional artisans.
-Analyze the provided product image (if available) AND the artisan's spoken voice description / keywords: "{keywords}" (English Translation: "{translated_en}").
+        if keywords and keywords.strip():
+            artisan_voice_context = f'Artisan\'s spoken description / notes: "{keywords}" (English translation: "{translated_en}").'
+        else:
+            artisan_voice_context = "No voice note provided. Analyze the uploaded product photo directly and identify what item is shown."
+
+        prompt = f"""You are an expert AI business cataloger and senior e-commerce copywriter for Hastakala - an e-commerce marketplace for Indian artisans and craftspeople.
+Carefully inspect the provided product image. {artisan_voice_context}
+
+CRITICAL RULES:
+1. Base your classification PRIMARILY on what is actually visible in the image!
+2. If the image clearly shows specific products (e.g. pottery, wood carving, metal craft, textiles, bottles, brassware, baskets, etc.), accurately identify and describe what is visible. Do NOT invent a saree or handloom weaving if the photo shows something else!
+3. If it is a handicraft or artisan product, identify the authentic craft style (e.g., Terracotta Pottery, Madhubani Art, Dokra Metal Craft, Blue Pottery, Bamboo Craft, Wood Carving, etc.). If it is a packaged good or modern item, describe it accurately.
 
 Generate a structured JSON object with these exact keys:
-1. "title": A high-converting 3-6 word English product title based on visual colors, shape, materials, and artisan keywords (e.g. "Handcrafted Cobalt Blue Terracotta Clay Pot").
-2. "description_en": A rich, captivating 3-4 sentence e-commerce SEO product description in English. Highlight visual colors, material textures, traditional artisan heritage, aesthetic elegance, and practical daily utility. Do NOT use parenthesis or generic fallback placeholders.
-3. "category": Relevant e-commerce category string (e.g. "Kitchen & Dining  ›  Terracotta Pottery").
-4. "materials": Primary natural eco-friendly materials visible/described.
-5. "tags": 5 bullet-separated tags (e.g. "Handmade • Artisanal • Terracotta • Pot • Sustainable").
+1. "title": An accurate 3-6 word English product title based on what is shown in the image (and matching artisan description if provided).
+2. "type_of_art": Craft heritage or craft style (e.g. "Terracotta Pottery", "Dokra Metal Craft", "Madhubani Painting", "Handloom Weaving", "Bamboo Craft", "Handcrafted Decor", etc.). If not a traditional craft, name the product/material craft category accurately.
+3. "category": Relevant marketplace category (e.g. "Pottery & Clay", "Handloom & Textiles", "Bamboo & Cane", "Metal Craft", "Wood Carving", "Home & Living", "Eco Crafts").
+4. "description_en": A rich, captivating 3-4 sentence e-commerce SEO product description in English accurately describing the item's visual colors, shape, materials, and purpose.
+5. "materials": Primary materials visible/described.
+6. "tags": 5 bullet-separated tags (e.g. "Handmade • Artisanal • Terracotta • Pot • Sustainable").
 
 Return ONLY valid raw JSON format without markdown code blocks.
 """
@@ -344,32 +379,47 @@ Return ONLY valid raw JSON format without markdown code blocks.
             "generationConfig": {"responseMimeType": "application/json"}
         }
 
-        # Try models in order
-        for model in ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro"]:
-            for auth_type in ["key", "bearer"]:
-                if auth_type == "key":
-                    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-                    headers = {}
-                else:
-                    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-                    headers = {"Authorization": f"Bearer {api_key}"}
+        # Model priority: prioritize reliable fast flash models, with cascade fallback
+        models_to_try = [
+            GEMINI_MODEL or "gemini-3.5-flash",
+            "gemini-3.5-flash",
+            "gemini-3.8-flash",
+            "gemini-flash-latest",
+            "gemini-3.7-flash",
+            "gemini-3.6-flash",
+            "gemini-3.1-flash-lite",
+        ]
 
-                try:
-                    r = requests.post(url, json=body, headers=headers, timeout=5)
-                    if r.status_code == 200:
-                        data = r.json()
-                        text_resp = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-                        if text_resp.startswith("```"):
-                            text_resp = re.sub(r"^```(?:json)?\n?", "", text_resp)
-                            text_resp = re.sub(r"\n?```$", "", text_resp)
-                        parsed = json.loads(text_resp)
-                        if parsed and parsed.get("description_en"):
-                            return parsed
-                except Exception:
-                    continue
+        seen = set()
+        unique_models = []
+        for m in models_to_try:
+            if m not in seen:
+                seen.add(m)
+                unique_models.append(m)
+
+        for model in unique_models:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+            try:
+                r = requests.post(url, json=body, timeout=20)
+                if r.status_code == 200:
+                    data = r.json()
+                    text_resp = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                    if text_resp.startswith("```"):
+                        text_resp = re.sub(r"^```(?:json)?\n?", "", text_resp)
+                        text_resp = re.sub(r"\n?```$", "", text_resp)
+                    parsed = json.loads(text_resp)
+                    if parsed and parsed.get("description_en") and parsed.get("title"):
+                        if isinstance(parsed.get("materials"), list):
+                            parsed["materials"] = " • ".join(str(m) for m in parsed["materials"])
+                        if isinstance(parsed.get("tags"), list):
+                            parsed["tags"] = " • ".join(str(t) for t in parsed["tags"])
+                        parsed["model_used"] = model
+                        return parsed
+            except Exception as ex:
+                continue
 
     except Exception as e:
-        print(f"Gemini Multimodal AI Generation error: {e}")
+        print(f"Gemini 3.8 Flash Multimodal AI Generation error: {e}")
     return None
 
 def generate_catalog_from_voice_or_text(
@@ -378,11 +428,13 @@ def generate_catalog_from_voice_or_text(
     audio_filename: str = "",
     language: str = "Auto-Detect",
     image_url: str = "",
-    image_bytes: bytes = None
+    image_bytes: bytes = None,
+    image_base64: str = ""
 ) -> dict:
     """
-    Multilingual Multimodal Auto-Cataloger Engine:
-    Processes product image + regional audio voice notes / text transcriptions, auto-detects language, translates to English, and generates rich e-commerce product descriptions in English.
+    Multilingual Multimodal Auto-Cataloger Engine Powered by Gemini 3.8 Flash:
+    Processes product image + regional audio voice notes / text transcriptions, auto-detects language,
+    translates to English, and generates rich e-commerce product descriptions, type of art, category, and tags.
     """
     if audio_bytes and not voice_text:
         voice_text = "Handcrafted artisan product described via audio recording"
@@ -394,34 +446,58 @@ def generate_catalog_from_voice_or_text(
 
     target_lang_name = detected_lang if detected_lang and detected_lang != "English" else "Hindi"
 
-    # 1. Primary: Gemini AI Call
-    gemini_res = generate_with_gemini(voice_text, translated_en, image_url=image_url, image_bytes=image_bytes, target_lang=target_lang_name)
+    # 1. Primary: Gemini 3.8 Flash AI Multimodal Call
+    gemini_res = generate_with_gemini(
+        voice_text,
+        translated_en,
+        image_url=image_url,
+        image_bytes=image_bytes,
+        image_base64=image_base64,
+        target_lang=target_lang_name
+    )
     if gemini_res and gemini_res.get("description_en") and gemini_res.get("title"):
+        model_name = gemini_res.get("model_used", "gemini-3.8-flash")
         return {
             "title": gemini_res.get("title"),
+            "type_of_art": gemini_res.get("type_of_art", "Traditional Indian Craft"),
+            "category": gemini_res.get("category", "Artisanal Handicrafts  ›  Heritage Crafts"),
             "description_en": gemini_res.get("description_en"),
             "description_regional": gemini_res.get("description_en"),
             "description_hi": gemini_res.get("description_en"),
-            "category": gemini_res.get("category", "Artisanal Handicrafts  ›  Heritage Crafts"),
             "materials": gemini_res.get("materials", "Natural Eco-Friendly Materials"),
             "tags": gemini_res.get("tags", "Handmade • Heritage • Artisanal • Sustainable"),
             "detected_language": detected_lang,
             "original_text": original_text,
             "translated_english": translated_en,
             "transcription": original_text or "Voice note audio processed successfully.",
-            "ai_engine": "Gemini Multimodal AI",
+            "ai_engine": f"Gemini 3.8 Flash Multimodal AI ({model_name})",
             "status": "Success"
         }
 
-    # 2. Advanced Craft Cataloger Generator
+    # 2. Advanced Craft Cataloger Generator Fallback
     hq_res = build_high_quality_english_description(voice_text, translated_en, detected_lang=detected_lang)
+
+    # Deduce type of art for fallback
+    art_type = "Traditional Indian Craft"
+    cat_lower = hq_res["category"].lower()
+    if "pottery" in cat_lower or "clay" in cat_lower:
+        art_type = "Terracotta Pottery"
+    elif "textile" in cat_lower or "saree" in cat_lower:
+        art_type = "Handloom Weaving"
+    elif "bamboo" in cat_lower or "cane" in cat_lower:
+        art_type = "Bamboo & Cane Craft"
+    elif "metal" in cat_lower or "dokra" in cat_lower:
+        art_type = "Dokra Metal Craft"
+    elif "wood" in cat_lower:
+        art_type = "Wood Carving"
 
     return {
         "title": hq_res["title"],
+        "type_of_art": art_type,
+        "category": hq_res["category"],
         "description_en": hq_res["description_en"],
         "description_regional": hq_res["description_en"],
         "description_hi": hq_res["description_en"],
-        "category": hq_res["category"],
         "materials": hq_res["materials"],
         "tags": hq_res["tags"],
         "detected_language": detected_lang,

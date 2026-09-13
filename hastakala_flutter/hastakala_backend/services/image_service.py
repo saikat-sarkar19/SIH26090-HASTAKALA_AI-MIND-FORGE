@@ -42,7 +42,7 @@ def enhance_product_image_with_photoroom(
     with open(raw_path, "wb") as f:
         f.write(image_bytes)
 
-    api_key = PHOTOROOM_API_KEY or "sk_pr_default_5d473f437eaf270cf71ab63fa1dfdb58a74c877c"
+    api_key = PHOTOROOM_API_KEY or "sandbox_sk_pr_default_1d1f867fc8626c9c4639838a4178f762219c4f9c"
 
     # Build background prompt
     if bg_style == "custom" and custom_bg_prompt.strip():
@@ -51,39 +51,61 @@ def enhance_product_image_with_photoroom(
         bg_prompt = BACKGROUND_PROMPTS.get(bg_style.lower(), BACKGROUND_PROMPTS['white'])
 
     pr_success = False
-    engine_name = "PhotoRoom AI Studio Engine v2"
+    engine_name = "PhotoRoom Sandbox Background Removal API"
     improvements = []
 
-    # 1. Try PhotoRoom v2 API (AI Background Generation & Studio Relighting)
-    try:
-        url_v2 = "https://image-api.photoroom.com/v2/edit"
-        headers = {"x-api-key": api_key}
-        files = {"imageFile": (original_filename or "product.jpg", image_bytes, "image/jpeg")}
-        data = {
-            "background.prompt": bg_prompt,
-            "outputSize": "1000x1000"
-        }
-        r = requests.post(url_v2, headers=headers, files=files, data=data, timeout=12)
-        if r.status_code == 200 and len(r.content) > 5000:
-            with open(enhanced_path, "wb") as f:
-                f.write(r.content)
-            pr_success = True
-            improvements = [
-                f"PhotoRoom AI Studio Background Applied ({bg_style.title()})",
-                f"Prompt: {bg_prompt}",
-                "Product Auto-Relighting & Shadow Synthesis Enabled",
-                "Formatted to 1000x1000 High-Res E-Commerce Standard"
-            ]
-    except Exception as e:
-        print(f"PhotoRoom v2 API error: {e}")
+    # 1. Check if user requested direct background removal (transparent cutout)
+    if bg_style.lower() in ["transparent", "remove", "cutout"]:
+        try:
+            url_v1 = "https://sdk.photoroom.com/v1/segment"
+            headers = {"x-api-key": api_key}
+            files = {"image_file": (original_filename or "product.jpg", image_bytes, "image/jpeg")}
+            r = requests.post(url_v1, headers=headers, files=files, timeout=12)
+            if r.status_code == 200 and len(r.content) > 3000:
+                with open(enhanced_path, "wb") as f:
+                    f.write(r.content)
+                pr_success = True
+                engine_name = "PhotoRoom Sandbox Background Removal API"
+                improvements = [
+                    "PhotoRoom Sandbox Background Removed (Clean Cutout)",
+                    "Transparent Alpha Channel Preserved",
+                    "E-Commerce Catalog High-Res Ready"
+                ]
+        except Exception as e:
+            print(f"PhotoRoom transparent cutout error: {e}")
 
-    # 2. Try PhotoRoom v1 API (Transparent Cutout & Studio Background Composite)
+    # 2. Try PhotoRoom v2 API (AI Background Generation & Studio Relighting)
+    if not pr_success and bg_style.lower() not in ["transparent", "remove", "cutout"]:
+        try:
+            url_v2 = "https://image-api.photoroom.com/v2/edit"
+            headers = {"x-api-key": api_key}
+            files = {"imageFile": (original_filename or "product.jpg", image_bytes, "image/jpeg")}
+            data = {
+                "background.prompt": bg_prompt,
+                "outputSize": "1000x1000"
+            }
+            r = requests.post(url_v2, headers=headers, files=files, data=data, timeout=12)
+            if r.status_code == 200 and len(r.content) > 5000:
+                with open(enhanced_path, "wb") as f:
+                    f.write(r.content)
+                pr_success = True
+                engine_name = "PhotoRoom Sandbox AI Studio v2"
+                improvements = [
+                    f"PhotoRoom AI Studio Background Applied ({bg_style.title()})",
+                    f"Prompt: {bg_prompt}",
+                    "Product Auto-Relighting & Shadow Synthesis Enabled",
+                    "Formatted to 1000x1000 High-Res E-Commerce Standard"
+                ]
+        except Exception as e:
+            print(f"PhotoRoom v2 API error: {e}")
+
+    # 3. Try PhotoRoom v1 API (Background Removal & Studio Composite)
     if not pr_success:
         try:
             url_v1 = "https://sdk.photoroom.com/v1/segment"
             headers = {"x-api-key": api_key}
             files = {"image_file": (original_filename or "product.jpg", image_bytes, "image/jpeg")}
-            r = requests.post(url_v1, headers=headers, files=files, timeout=10)
+            r = requests.post(url_v1, headers=headers, files=files, timeout=12)
             if r.status_code == 200 and len(r.content) > 3000:
                 cutout = Image.open(BytesIO(r.content)).convert("RGBA")
                 w, h = cutout.size
@@ -95,9 +117,9 @@ def enhance_product_image_with_photoroom(
                 final_img = studio_bg.resize((800, 800), Image.Resampling.LANCZOS).convert("RGB")
                 final_img.save(enhanced_path, "PNG", quality=95)
                 pr_success = True
-                engine_name = "PhotoRoom Segment Cutout Engine v1"
+                engine_name = "PhotoRoom Sandbox Segment Engine v1"
                 improvements = [
-                    "PhotoRoom Precision Cutout & Background Removal Applied",
+                    "PhotoRoom Sandbox Background Removed (Clean Cutout)",
                     "Clean Studio White Background Synthesized",
                     "Formatted to 800x800 High-Res E-Commerce Standard"
                 ]

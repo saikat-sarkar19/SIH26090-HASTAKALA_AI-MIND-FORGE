@@ -94,13 +94,23 @@ class ApiService {
     return null;
   }
 
-  // Multilingual & Multimodal Voice/Text Cataloger API
-  static Future<Map<String, dynamic>?> generateCatalog(String voiceText, {String language = 'Auto-Detect', String imageUrl = ''}) async {
+  // Multilingual & Multimodal Voice/Text Cataloger API (Gemini 3.8 Flash)
+  static Future<Map<String, dynamic>?> generateCatalog(
+    String voiceText, {
+    String language = 'Auto-Detect',
+    String imageUrl = '',
+    String imageBase64 = '',
+  }) async {
     try {
       final res = await http.post(
         Uri.parse('$baseUrl/api/catalog/generate'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'voice_text': voiceText, 'language': language, 'image_url': imageUrl}),
+        body: jsonEncode({
+          'voice_text': voiceText,
+          'language': language,
+          'image_url': imageUrl,
+          'image_base64': imageBase64,
+        }),
       );
       if (res.statusCode == 200) {
         return jsonDecode(res.body);
@@ -157,13 +167,24 @@ class ApiService {
     return null;
   }
 
-  // Fetch Products
-  static Future<List<dynamic>> getProducts({int? artisanId, String? artisanUsername}) async {
+  // Fetch Products (With Category & Search filtering)
+  static Future<List<dynamic>> getProducts({
+    int? artisanId,
+    String? artisanUsername,
+    String? category,
+    String? search,
+  }) async {
     try {
       final queryParams = <String, String>{};
       if (artisanId != null) queryParams['artisan_id'] = artisanId.toString();
       if (artisanUsername != null && artisanUsername.isNotEmpty) {
         queryParams['artisan_username'] = artisanUsername;
+      }
+      if (category != null && category.isNotEmpty && category.toLowerCase() != 'all') {
+        queryParams['category'] = category;
+      }
+      if (search != null && search.trim().isNotEmpty) {
+        queryParams['search'] = search.trim();
       }
       final uri = Uri.parse('$baseUrl/api/products').replace(queryParameters: queryParams.isEmpty ? null : queryParams);
       final res = await http.get(uri);
@@ -262,7 +283,8 @@ class ApiService {
     return '$baseUrl$relativePath';
   }
 
-  // Artisan Login API
+  // --- Artisan Auth APIs ---
+
   static Future<Map<String, dynamic>?> loginArtisan(String username, String password) async {
     try {
       final res = await http.post(
@@ -286,7 +308,6 @@ class ApiService {
     }
   }
 
-  // Artisan Registration API
   static Future<Map<String, dynamic>?> registerArtisan({
     required String fullName,
     required String username,
@@ -326,7 +347,6 @@ class ApiService {
     }
   }
 
-  // Artisan Profile Update API
   static Future<Map<String, dynamic>?> updateArtisanProfile({
     required String username,
     String? fullName,
@@ -365,5 +385,159 @@ class ApiService {
       return {'status': 'error', 'detail': 'Server connection error: $e'};
     }
   }
-}
 
+  // --- Buyer Auth APIs ---
+
+  static Future<Map<String, dynamic>?> loginBuyer(String username, String password) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/api/auth/buyer/login'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'username': username, 'password': password}),
+      );
+      if (res.statusCode == 200) {
+        return jsonDecode(res.body);
+      } else {
+        try {
+          final err = jsonDecode(res.body);
+          return {'status': 'error', 'detail': err['detail'] ?? 'Buyer login failed'};
+        } catch (_) {
+          return {'status': 'error', 'detail': 'Invalid buyer credentials'};
+        }
+      }
+    } catch (e) {
+      debugPrint('Error logging in buyer: $e');
+      return {'status': 'error', 'detail': 'Server connection error: $e'};
+    }
+  }
+
+  static Future<Map<String, dynamic>?> registerBuyer({
+    required String organizationName,
+    required String contactPerson,
+    required String username,
+    required String password,
+    String phone = '',
+    String contactEmail = '',
+    String buyerType = 'Corporate Wholesale Buyer',
+    String location = 'India',
+    String targetCategory = 'Handicrafts & Handloom',
+    int minOrderQty = 25,
+  }) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/api/auth/buyer/register'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'organization_name': organizationName,
+          'contact_person': contactPerson,
+          'username': username,
+          'password': password,
+          'phone': phone,
+          'contact_email': contactEmail,
+          'buyer_type': buyerType,
+          'location': location,
+          'target_category': targetCategory,
+          'min_order_qty': minOrderQty,
+        }),
+      );
+      if (res.statusCode == 200) {
+        return jsonDecode(res.body);
+      } else {
+        try {
+          final err = jsonDecode(res.body);
+          return {'status': 'error', 'detail': err['detail'] ?? 'Buyer registration failed'};
+        } catch (_) {
+          return {'status': 'error', 'detail': 'Buyer registration failed'};
+        }
+      }
+    } catch (e) {
+      debugPrint('Error registering buyer: $e');
+      return {'status': 'error', 'detail': 'Server connection error: $e'};
+    }
+  }
+
+  // --- B2B Enquiries APIs (The Heart of the Marketplace) ---
+
+  static Future<Map<String, dynamic>?> createEnquiry(Map<String, dynamic> enquiryData) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/api/enquiries'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(enquiryData),
+      );
+      if (res.statusCode == 200) {
+        return jsonDecode(res.body);
+      } else {
+        try {
+          final err = jsonDecode(res.body);
+          return {'status': 'error', 'detail': err['detail'] ?? 'Failed to send enquiry'};
+        } catch (_) {
+          return {'status': 'error', 'detail': 'Failed to send enquiry'};
+        }
+      }
+    } catch (e) {
+      debugPrint('Error creating enquiry: $e');
+      return {'status': 'error', 'detail': 'Server connection error: $e'};
+    }
+  }
+
+  static Future<List<dynamic>> getEnquiries({
+    int? productId,
+    int? artisanId,
+    String? artisanUsername,
+    int? buyerId,
+    String? buyerName,
+  }) async {
+    try {
+      final queryParams = <String, String>{};
+      if (productId != null) queryParams['product_id'] = productId.toString();
+      if (artisanId != null) queryParams['artisan_id'] = artisanId.toString();
+      if (artisanUsername != null && artisanUsername.isNotEmpty) {
+        queryParams['artisan_username'] = artisanUsername;
+      }
+      if (buyerId != null) queryParams['buyer_id'] = buyerId.toString();
+      if (buyerName != null && buyerName.isNotEmpty) {
+        queryParams['buyer_name'] = buyerName;
+      }
+      final uri = Uri.parse('$baseUrl/api/enquiries').replace(queryParameters: queryParams.isEmpty ? null : queryParams);
+      final res = await http.get(uri);
+      if (res.statusCode == 200) {
+        return jsonDecode(res.body);
+      }
+    } catch (e) {
+      debugPrint('Error fetching enquiries: $e');
+    }
+    return [];
+  }
+
+  static Future<bool> updateEnquiryStatus(int enquiryId, String newStatus) async {
+    try {
+      final res = await http.patch(
+        Uri.parse('$baseUrl/api/enquiries/$enquiryId/status'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'status': newStatus}),
+      );
+      return res.statusCode == 200;
+    } catch (e) {
+      debugPrint('Error updating enquiry status: $e');
+      return false;
+    }
+  }
+
+  static Future<List<dynamic>> getRecommendations({String? category, int limit = 4}) async {
+    try {
+      final queryParams = <String, String>{'limit': limit.toString()};
+      if (category != null && category.isNotEmpty && category.toLowerCase() != 'all') {
+        queryParams['category'] = category;
+      }
+      final uri = Uri.parse('$baseUrl/api/recommendations').replace(queryParameters: queryParams);
+      final res = await http.get(uri);
+      if (res.statusCode == 200) {
+        return jsonDecode(res.body);
+      }
+    } catch (e) {
+      debugPrint('Error fetching recommendations: $e');
+    }
+    return [];
+  }
+}
