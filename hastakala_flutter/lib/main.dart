@@ -1675,6 +1675,7 @@ class AddProductPage extends StatefulWidget {
 class _AddProductPageState extends State<AddProductPage> {
   int step = 0;
   bool processing = false;
+  bool isEnhancingPhoto = false;
   bool publishing = false;
   bool isListening = false;
   bool calculatingPricing = false;
@@ -2252,7 +2253,7 @@ class _AddProductPageState extends State<AddProductPage> {
                                       mainAxisAlignment: MainAxisAlignment.center,
                                       children: [
                                         const Text('PhotoRoom Studio ✨', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.wine)),
-                                        if (processing) ...[
+                                        if (isEnhancingPhoto) ...[
                                           const SizedBox(width: 6),
                                           const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.wine)),
                                         ],
@@ -2308,7 +2309,7 @@ class _AddProductPageState extends State<AddProductPage> {
                                 ),
                                 const SizedBox(width: 4),
                                 ElevatedButton.icon(
-                                  onPressed: _reEnhanceWithPhotoRoom,
+                                  onPressed: isEnhancingPhoto ? null : _reEnhanceWithPhotoRoom,
                                   icon: const Icon(Icons.auto_awesome, size: 14),
                                   label: const Text('Re-Enhance', style: TextStyle(fontSize: 12)),
                                   style: ElevatedButton.styleFrom(
@@ -2325,43 +2326,54 @@ class _AddProductPageState extends State<AddProductPage> {
                       ),
                     ],
                   )
-                : Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const CircleAvatar(radius: 36, backgroundColor: AppColors.wine, child: Icon(Icons.camera_alt_outlined, size: 34, color: Colors.white)),
-                      const SizedBox(height: 16),
-                      const Text('Tap to capture or choose photo', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                      const SizedBox(height: 6),
-                      const Text('PhotoRoom API will isolate product and generate AI background', style: TextStyle(color: AppColors.muted, fontSize: 12)),
-                      const SizedBox(height: 16),
-                      Row(
+                : isEnhancingPhoto
+                    ? Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: const [
+                          CircularProgressIndicator(color: AppColors.wine),
+                          SizedBox(height: 16),
+                          Text('Enhancing Photo with PhotoRoom AI... ✨', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.wine)),
+                          SizedBox(height: 6),
+                          Text('Removing background & creating studio backdrop', style: TextStyle(color: AppColors.muted, fontSize: 12)),
+                        ],
+                      )
+                    : Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          ElevatedButton.icon(
-                            onPressed: () => _pickAndEnhanceImage(ImageSource.camera),
-                            icon: const Icon(Icons.camera),
-                            label: const Text('Camera'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.cream,
-                              foregroundColor: AppColors.wine,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          ElevatedButton.icon(
-                            onPressed: () => _pickAndEnhanceImage(ImageSource.gallery),
-                            icon: const Icon(Icons.photo_library),
-                            label: const Text('Gallery'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.cream,
-                              foregroundColor: AppColors.wine,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
+                          const CircleAvatar(radius: 36, backgroundColor: AppColors.wine, child: Icon(Icons.camera_alt_outlined, size: 34, color: Colors.white)),
+                          const SizedBox(height: 16),
+                          const Text('Tap to capture or choose photo', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          const SizedBox(height: 6),
+                          const Text('PhotoRoom API will isolate product and generate AI background', style: TextStyle(color: AppColors.muted, fontSize: 12)),
+                          const SizedBox(height: 16),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              ElevatedButton.icon(
+                                onPressed: () => _pickAndEnhanceImage(ImageSource.camera),
+                                icon: const Icon(Icons.camera),
+                                label: const Text('Camera'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.cream,
+                                  foregroundColor: AppColors.wine,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              ElevatedButton.icon(
+                                onPressed: () => _pickAndEnhanceImage(ImageSource.gallery),
+                                icon: const Icon(Icons.photo_library),
+                                label: const Text('Gallery'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.cream,
+                                  foregroundColor: AppColors.wine,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                    ],
-                  ),
           ),
         ],
       ),
@@ -2370,7 +2382,7 @@ class _AddProductPageState extends State<AddProductPage> {
 
   Future<void> _reEnhanceWithPhotoRoom() async {
     if (selectedImageBytes == null) return;
-    setState(() => processing = true);
+    setState(() => isEnhancingPhoto = true);
     final result = await ApiService.enhanceImage(
       selectedImageBytes!,
       originalFileName ?? 'product.jpg',
@@ -2380,7 +2392,7 @@ class _AddProductPageState extends State<AddProductPage> {
     if (mounted) {
       setState(() {
         enhancedImageResult = result;
-        processing = false;
+        isEnhancingPhoto = false;
       });
     }
   }
@@ -2394,7 +2406,7 @@ class _AddProductPageState extends State<AddProductPage> {
         setState(() {
           selectedImageBytes = bytes;
           originalFileName = picked.name;
-          processing = true;
+          isEnhancingPhoto = true;
         });
         final result = await ApiService.enhanceImage(
           bytes,
@@ -2405,13 +2417,13 @@ class _AddProductPageState extends State<AddProductPage> {
         if (mounted) {
           setState(() {
             enhancedImageResult = result;
-            processing = false;
+            isEnhancingPhoto = false;
           });
         }
       }
     } catch (e) {
       if (mounted) {
-        setState(() => processing = false);
+        setState(() => isEnhancingPhoto = false);
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Image selection error: $e')));
       }
     }
