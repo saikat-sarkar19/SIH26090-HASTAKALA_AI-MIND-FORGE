@@ -8,6 +8,27 @@ from typing import Optional, List
 from datetime import datetime
 import json
 import os
+import mimetypes
+
+def get_media_type(file_path: Path) -> str:
+    ext = file_path.suffix.lower()
+    if ext == ".js":
+        return "application/javascript"
+    if ext == ".wasm":
+        return "application/wasm"
+    if ext == ".json":
+        return "application/json"
+    if ext == ".css":
+        return "text/css"
+    if ext == ".html":
+        return "text/html"
+    if ext == ".png":
+        return "image/png"
+    if ext in (".jpg", ".jpeg"):
+        return "image/jpeg"
+    mime, _ = mimetypes.guess_type(str(file_path))
+    return mime or "application/octet-stream"
+
 
 from hastakala_backend.config import UPLOAD_DIR, ENHANCED_DIR, AUDIO_DIR, HOST, PORT
 from hastakala_backend.database import (
@@ -143,7 +164,7 @@ def api_info():
 def serve_index():
     index_path = WEB_DIR / "index.html"
     if index_path.exists():
-        return FileResponse(index_path)
+        return FileResponse(index_path, media_type="text/html")
     return {
         "status": "online",
         "app": "Hastakala AI Business Manager Backend",
@@ -303,49 +324,49 @@ def get_due_orders(
 def serve_bootstrap():
     p = WEB_DIR / "flutter_bootstrap.js"
     if p.exists():
-        return FileResponse(p)
+        return FileResponse(p, media_type="application/javascript")
     raise HTTPException(status_code=404, detail="File not found")
 
 @app.get("/flutter.js")
 def serve_flutter_js():
     p = WEB_DIR / "flutter.js"
     if p.exists():
-        return FileResponse(p)
+        return FileResponse(p, media_type="application/javascript")
     raise HTTPException(status_code=404, detail="File not found")
 
 @app.get("/main.dart.js")
 def serve_main_dart():
     p = WEB_DIR / "main.dart.js"
     if p.exists():
-        return FileResponse(p)
+        return FileResponse(p, media_type="application/javascript")
     raise HTTPException(status_code=404, detail="File not found")
 
 @app.get("/flutter_service_worker.js")
 def serve_sw():
     p = WEB_DIR / "flutter_service_worker.js"
     if p.exists():
-        return FileResponse(p)
+        return FileResponse(p, media_type="application/javascript")
     raise HTTPException(status_code=404, detail="File not found")
 
 @app.get("/manifest.json")
 def serve_manifest():
     p = WEB_DIR / "manifest.json"
     if p.exists():
-        return FileResponse(p)
+        return FileResponse(p, media_type="application/json")
     raise HTTPException(status_code=404, detail="File not found")
 
 @app.get("/favicon.png")
 def serve_favicon():
     p = WEB_DIR / "favicon.png"
     if p.exists():
-        return FileResponse(p)
+        return FileResponse(p, media_type="image/png")
     raise HTTPException(status_code=404, detail="File not found")
 
 @app.get("/version.json")
 def serve_version():
     p = WEB_DIR / "version.json"
     if p.exists():
-        return FileResponse(p)
+        return FileResponse(p, media_type="application/json")
     raise HTTPException(status_code=404, detail="File not found")
 
 @app.get("/{full_path:path}")
@@ -354,18 +375,18 @@ def serve_spa_fallback(full_path: str):
     if clean_path in ("api/index.py", "index.py", ""):
         index_path = WEB_DIR / "index.html"
         if index_path.exists():
-            return FileResponse(index_path)
+            return FileResponse(index_path, media_type="text/html")
 
     if (full_path.startswith("api/") and not full_path.startswith("api/index.py")) or full_path.startswith("uploads/") or full_path in ("docs", "openapi.json"):
         raise HTTPException(status_code=404, detail="API endpoint not found")
     
     target_file = WEB_DIR / full_path
     if full_path and target_file.exists() and target_file.is_file():
-        return FileResponse(target_file)
+        return FileResponse(target_file, media_type=get_media_type(target_file))
     
     index_path = WEB_DIR / "index.html"
     if index_path.exists():
-        return FileResponse(index_path)
+        return FileResponse(index_path, media_type="text/html")
     
     raise HTTPException(status_code=404, detail="Page not found")
 
