@@ -2426,6 +2426,7 @@ class _AddProductPageState extends State<AddProductPage> {
           setState(() {
             enhancedImageResult = result;
             isEnhancingPhoto = false;
+            step = 1; // Automatically take user to Voice Catalog section!
           });
         }
       }
