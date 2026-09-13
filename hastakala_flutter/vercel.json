@@ -1,28 +1,35 @@
 {
-  "outputDirectory": "build/web",
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/index.py",
+      "use": "@vercel/python"
+    },
+    {
+      "src": "build/web/**",
+      "use": "@vercel/static"
+    }
+  ],
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/api/index.py"
+      "dest": "api/index.py"
     },
     {
       "src": "/docs",
-      "dest": "/api/index.py"
+      "dest": "api/index.py"
     },
     {
       "src": "/openapi.json",
-      "dest": "/api/index.py"
+      "dest": "api/index.py"
     },
     {
       "src": "/uploads/(.*)",
-      "dest": "/api/index.py"
-    },
-    {
-      "handle": "filesystem"
+      "dest": "api/index.py"
     },
     {
       "src": "/(.*)",
-      "dest": "/index.html"
+      "dest": "build/web/$1"
     }
   ]
 }
