@@ -7,4 +7,6 @@ requests>=2.31.0
 httpx>=0.24.0
 pymongo>=4.0.0
 dnspython>=2.0.0
+certifi>=2023.7.22
+
 
