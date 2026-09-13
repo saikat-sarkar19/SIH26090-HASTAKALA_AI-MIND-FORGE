@@ -17,7 +17,7 @@ class TestHastakalaBackend(unittest.TestCase):
     def test_root_endpoint(self):
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
-        self.assertIn("Hastakala", response.json()["app"])
+        self.assertIn("html", response.text.lower())
 
     def test_api_info_endpoint(self):
         response = self.client.get("/api/info")

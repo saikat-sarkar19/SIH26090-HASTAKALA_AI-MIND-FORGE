@@ -46,6 +46,16 @@ app.add_middleware(
 # Mount Static Directories for serving uploaded and enhanced images
 app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 
+WEB_DIR = Path(__file__).resolve().parent.parent / "build" / "web"
+
+if (WEB_DIR / "assets").exists():
+    app.mount("/assets", StaticFiles(directory=str(WEB_DIR / "assets")), name="web_assets")
+if (WEB_DIR / "canvaskit").exists():
+    app.mount("/canvaskit", StaticFiles(directory=str(WEB_DIR / "canvaskit")), name="web_canvaskit")
+if (WEB_DIR / "icons").exists():
+    app.mount("/icons", StaticFiles(directory=str(WEB_DIR / "icons")), name="web_icons")
+
+
 
 # --- Models ---
 class CatalogRequest(BaseModel):
@@ -116,9 +126,8 @@ class ProfileUpdateRequest(BaseModel):
 
 # --- Routes ---
 
-@app.get("/")
-@app.get("/api")
 @app.get("/api/info")
+@app.get("/api/status")
 def api_info():
     return {
         "status": "online",
@@ -126,6 +135,18 @@ def api_info():
         "database": get_db_info(),
         "version": "1.0.0",
         "documentation": "/docs"
+    }
+
+@app.get("/")
+@app.get("/index.html")
+def serve_index():
+    index_path = WEB_DIR / "index.html"
+    if index_path.exists():
+        return FileResponse(index_path)
+    return {
+        "status": "online",
+        "app": "Hastakala AI Business Manager Backend",
+        "database": get_db_info()
     }
 
 @app.post("/api/auth/register")
@@ -275,9 +296,76 @@ def get_due_orders(
 ):
     return db_get_due_orders(artisan_id=artisan_id, artisan_username=artisan_username)
 
+# --- Static Flutter Web Bundle Endpoints ---
+
+@app.get("/flutter_bootstrap.js")
+def serve_bootstrap():
+    p = WEB_DIR / "flutter_bootstrap.js"
+    if p.exists():
+        return FileResponse(p)
+    raise HTTPException(status_code=404, detail="File not found")
+
+@app.get("/flutter.js")
+def serve_flutter_js():
+    p = WEB_DIR / "flutter.js"
+    if p.exists():
+        return FileResponse(p)
+    raise HTTPException(status_code=404, detail="File not found")
+
+@app.get("/main.dart.js")
+def serve_main_dart():
+    p = WEB_DIR / "main.dart.js"
+    if p.exists():
+        return FileResponse(p)
+    raise HTTPException(status_code=404, detail="File not found")
+
+@app.get("/flutter_service_worker.js")
+def serve_sw():
+    p = WEB_DIR / "flutter_service_worker.js"
+    if p.exists():
+        return FileResponse(p)
+    raise HTTPException(status_code=404, detail="File not found")
+
+@app.get("/manifest.json")
+def serve_manifest():
+    p = WEB_DIR / "manifest.json"
+    if p.exists():
+        return FileResponse(p)
+    raise HTTPException(status_code=404, detail="File not found")
+
+@app.get("/favicon.png")
+def serve_favicon():
+    p = WEB_DIR / "favicon.png"
+    if p.exists():
+        return FileResponse(p)
+    raise HTTPException(status_code=404, detail="File not found")
+
+@app.get("/version.json")
+def serve_version():
+    p = WEB_DIR / "version.json"
+    if p.exists():
+        return FileResponse(p)
+    raise HTTPException(status_code=404, detail="File not found")
+
+@app.get("/{full_path:path}")
+def serve_spa_fallback(full_path: str):
+    if full_path.startswith("api/") or full_path.startswith("uploads/") or full_path == "docs" or full_path == "openapi.json":
+        raise HTTPException(status_code=404, detail="API endpoint not found")
+    
+    target_file = WEB_DIR / full_path
+    if full_path and target_file.exists() and target_file.is_file():
+        return FileResponse(target_file)
+    
+    index_path = WEB_DIR / "index.html"
+    if index_path.exists():
+        return FileResponse(index_path)
+    
+    raise HTTPException(status_code=404, detail="Page not found")
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("hastakala_backend.main:app", host=HOST, port=PORT, reload=True)
+
 
 
 
