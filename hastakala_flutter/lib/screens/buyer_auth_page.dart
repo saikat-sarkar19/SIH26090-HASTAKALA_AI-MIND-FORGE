@@ -38,11 +38,14 @@ class _BuyerAuthPageState extends State<BuyerAuthPage> {
   final TextEditingController regContactPersonCtrl = TextEditingController();
   final TextEditingController regUsernameCtrl = TextEditingController();
   final TextEditingController regPasswordCtrl = TextEditingController();
+  final TextEditingController regConfirmPasswordCtrl = TextEditingController();
   final FocusNode regPasswordFocusNode = FocusNode();
+  final FocusNode regConfirmPasswordFocusNode = FocusNode();
   final TextEditingController regPhoneCtrl = TextEditingController();
   final TextEditingController regEmailCtrl = TextEditingController();
   final TextEditingController regLocationCtrl = TextEditingController(text: 'Mumbai, Maharashtra');
   String selectedBuyerType = 'Corporate Wholesale Buyer';
+  bool obscureConfirmPassword = true;
 
   final List<String> buyerTypes = [
     'Corporate Wholesale Buyer',
@@ -61,7 +64,9 @@ class _BuyerAuthPageState extends State<BuyerAuthPage> {
     regContactPersonCtrl.dispose();
     regUsernameCtrl.dispose();
     regPasswordCtrl.dispose();
+    regConfirmPasswordCtrl.dispose();
     regPasswordFocusNode.dispose();
+    regConfirmPasswordFocusNode.dispose();
     regPhoneCtrl.dispose();
     regEmailCtrl.dispose();
     regLocationCtrl.dispose();
@@ -102,6 +107,7 @@ class _BuyerAuthPageState extends State<BuyerAuthPage> {
     final person = regContactPersonCtrl.text.trim();
     final user = regUsernameCtrl.text.trim();
     final pwd = regPasswordCtrl.text.trim();
+    final confirmPwd = regConfirmPasswordCtrl.text.trim();
     final phone = regPhoneCtrl.text.trim();
     final email = regEmailCtrl.text.trim();
     final loc = regLocationCtrl.text.trim();
@@ -109,6 +115,13 @@ class _BuyerAuthPageState extends State<BuyerAuthPage> {
     if (org.isEmpty || user.isEmpty || pwd.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill all required fields (Organization, Username, Password).')),
+      );
+      return;
+    }
+
+    if (pwd != confirmPwd) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Passwords do not match! Please check password confirmation.')),
       );
       return;
     }
@@ -448,6 +461,31 @@ class _BuyerAuthPageState extends State<BuyerAuthPage> {
                             ),
                             labelText: 'Create Password *',
                             hintText: 'At least 4 chars',
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        TextField(
+                          key: ValueKey('buyer_reg_confirm_pass_${obscureConfirmPassword}'),
+                          controller: regConfirmPasswordCtrl,
+                          focusNode: regConfirmPasswordFocusNode,
+                          obscureText: obscureConfirmPassword,
+                          enableSuggestions: false,
+                          autocorrect: false,
+                          decoration: InputDecoration(
+                            prefixIcon: const Icon(Icons.lock_clock_outlined, color: Color(0xFF7A0B2E)),
+                            suffixIcon: IconButton(
+                              icon: Icon(obscureConfirmPassword ? Icons.visibility_outlined : Icons.visibility_off_outlined, color: Colors.grey),
+                              onPressed: () {
+                                setState(() => obscureConfirmPassword = !obscureConfirmPassword);
+                                regConfirmPasswordCtrl.selection = TextSelection.fromPosition(TextPosition(offset: regConfirmPasswordCtrl.text.length));
+                                regConfirmPasswordFocusNode.requestFocus();
+                              },
+                            ),
+                            labelText: 'Confirm Password *',
+                            hintText: 'Re-enter password',
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
                             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                           ),
