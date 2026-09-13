@@ -700,10 +700,13 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 16),
 
                     TextField(
+                      key: ValueKey('artisan_login_pass_${obscurePassword}'),
                       controller: passwordCtrl,
                       focusNode: passwordFocusNode,
                       enabled: !loading,
                       obscureText: obscurePassword,
+                      enableSuggestions: false,
+                      autocorrect: false,
                       textInputAction: TextInputAction.done,
                       onSubmitted: (_) => loading ? null : _handleLogin(),
                       onChanged: (_) => setState(() {}),
@@ -719,7 +722,11 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             IconButton(
                               icon: Icon(obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined, color: AppColors.muted),
-                              onPressed: () => setState(() => obscurePassword = !obscurePassword),
+                              onPressed: () {
+                                setState(() => obscurePassword = !obscurePassword);
+                                passwordCtrl.selection = TextSelection.fromPosition(TextPosition(offset: passwordCtrl.text.length));
+                                passwordFocusNode.requestFocus();
+                              },
                             ),
                           ],
                         ),
@@ -875,12 +882,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final TextEditingController addressCtrl = TextEditingController();
   final TextEditingController passwordCtrl = TextEditingController();
   final TextEditingController confirmPasswordCtrl = TextEditingController();
+  final FocusNode passwordFocusNode = FocusNode();
+  final FocusNode confirmPasswordFocusNode = FocusNode();
 
   String selectedGender = 'Male';
   String selectedCraft = 'Handloom Weaving & Textiles';
   bool obscurePassword = true;
   bool obscureConfirmPassword = true;
   bool loading = false;
+
+  @override
+  void dispose() {
+    fullNameCtrl.dispose();
+    usernameCtrl.dispose();
+    phoneCtrl.dispose();
+    addressCtrl.dispose();
+    passwordCtrl.dispose();
+    confirmPasswordCtrl.dispose();
+    passwordFocusNode.dispose();
+    confirmPasswordFocusNode.dispose();
+    super.dispose();
+  }
 
   final List<String> craftOptions = [
     'Handloom Weaving & Textiles',
@@ -1093,13 +1115,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   const Text('Create Password *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.wine)),
                   const SizedBox(height: 4),
                   TextField(
+                    key: ValueKey('reg_pass_${obscurePassword}'),
                     controller: passwordCtrl,
+                    focusNode: passwordFocusNode,
                     obscureText: obscurePassword,
+                    enableSuggestions: false,
+                    autocorrect: false,
+                    textInputAction: TextInputAction.next,
+                    onSubmitted: (_) => confirmPasswordFocusNode.requestFocus(),
                     decoration: InputDecoration(
                       prefixIcon: const Icon(Icons.lock_outlined, color: AppColors.wine),
                       suffixIcon: IconButton(
                         icon: Icon(obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined, color: AppColors.muted),
-                        onPressed: () => setState(() => obscurePassword = !obscurePassword),
+                        onPressed: () {
+                          setState(() => obscurePassword = !obscurePassword);
+                          passwordCtrl.selection = TextSelection.fromPosition(TextPosition(offset: passwordCtrl.text.length));
+                          passwordFocusNode.requestFocus();
+                        },
                       ),
                       hintText: '••••••••',
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
@@ -1111,13 +1143,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   const Text('Confirm Password *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.wine)),
                   const SizedBox(height: 4),
                   TextField(
+                    key: ValueKey('reg_confirm_pass_${obscureConfirmPassword}'),
                     controller: confirmPasswordCtrl,
+                    focusNode: confirmPasswordFocusNode,
                     obscureText: obscureConfirmPassword,
+                    enableSuggestions: false,
+                    autocorrect: false,
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (_) => loading ? null : _handleRegister(),
                     decoration: InputDecoration(
                       prefixIcon: const Icon(Icons.lock_clock_outlined, color: AppColors.wine),
                       suffixIcon: IconButton(
                         icon: Icon(obscureConfirmPassword ? Icons.visibility_outlined : Icons.visibility_off_outlined, color: AppColors.muted),
-                        onPressed: () => setState(() => obscureConfirmPassword = !obscureConfirmPassword),
+                        onPressed: () {
+                          setState(() => obscureConfirmPassword = !obscureConfirmPassword);
+                          confirmPasswordCtrl.selection = TextSelection.fromPosition(TextPosition(offset: confirmPasswordCtrl.text.length));
+                          confirmPasswordFocusNode.requestFocus();
+                        },
                       ),
                       hintText: 'Re-enter password',
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),

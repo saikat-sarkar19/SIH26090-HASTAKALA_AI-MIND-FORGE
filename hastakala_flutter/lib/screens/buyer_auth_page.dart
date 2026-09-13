@@ -31,12 +31,14 @@ class _BuyerAuthPageState extends State<BuyerAuthPage> {
   // Controllers for Login
   final TextEditingController loginUsernameCtrl = TextEditingController();
   final TextEditingController loginPasswordCtrl = TextEditingController();
+  final FocusNode loginPasswordFocusNode = FocusNode();
 
   // Controllers for Register
   final TextEditingController regOrgNameCtrl = TextEditingController();
   final TextEditingController regContactPersonCtrl = TextEditingController();
   final TextEditingController regUsernameCtrl = TextEditingController();
   final TextEditingController regPasswordCtrl = TextEditingController();
+  final FocusNode regPasswordFocusNode = FocusNode();
   final TextEditingController regPhoneCtrl = TextEditingController();
   final TextEditingController regEmailCtrl = TextEditingController();
   final TextEditingController regLocationCtrl = TextEditingController(text: 'Mumbai, Maharashtra');
@@ -54,10 +56,12 @@ class _BuyerAuthPageState extends State<BuyerAuthPage> {
   void dispose() {
     loginUsernameCtrl.dispose();
     loginPasswordCtrl.dispose();
+    loginPasswordFocusNode.dispose();
     regOrgNameCtrl.dispose();
     regContactPersonCtrl.dispose();
     regUsernameCtrl.dispose();
     regPasswordCtrl.dispose();
+    regPasswordFocusNode.dispose();
     regPhoneCtrl.dispose();
     regEmailCtrl.dispose();
     regLocationCtrl.dispose();
@@ -277,13 +281,21 @@ class _BuyerAuthPageState extends State<BuyerAuthPage> {
                         const SizedBox(height: 14),
 
                         TextField(
+                          key: ValueKey('buyer_login_pass_${obscurePassword}'),
                           controller: loginPasswordCtrl,
+                          focusNode: loginPasswordFocusNode,
                           obscureText: obscurePassword,
+                          enableSuggestions: false,
+                          autocorrect: false,
                           decoration: InputDecoration(
                             prefixIcon: const Icon(Icons.lock_outlined, color: Color(0xFF7A0B2E)),
                             suffixIcon: IconButton(
                               icon: Icon(obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined, color: Colors.grey),
-                              onPressed: () => setState(() => obscurePassword = !obscurePassword),
+                              onPressed: () {
+                                setState(() => obscurePassword = !obscurePassword);
+                                loginPasswordCtrl.selection = TextSelection.fromPosition(TextPosition(offset: loginPasswordCtrl.text.length));
+                                loginPasswordFocusNode.requestFocus();
+                              },
                             ),
                             labelText: 'Password',
                             hintText: 'Enter password',
@@ -418,10 +430,22 @@ class _BuyerAuthPageState extends State<BuyerAuthPage> {
                         const SizedBox(height: 12),
 
                         TextField(
+                          key: ValueKey('buyer_reg_pass_${obscurePassword}'),
                           controller: regPasswordCtrl,
+                          focusNode: regPasswordFocusNode,
                           obscureText: obscurePassword,
+                          enableSuggestions: false,
+                          autocorrect: false,
                           decoration: InputDecoration(
                             prefixIcon: const Icon(Icons.lock_outlined, color: Color(0xFF7A0B2E)),
+                            suffixIcon: IconButton(
+                              icon: Icon(obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined, color: Colors.grey),
+                              onPressed: () {
+                                setState(() => obscurePassword = !obscurePassword);
+                                regPasswordCtrl.selection = TextSelection.fromPosition(TextPosition(offset: regPasswordCtrl.text.length));
+                                regPasswordFocusNode.requestFocus();
+                              },
+                            ),
                             labelText: 'Create Password *',
                             hintText: 'At least 4 chars',
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
