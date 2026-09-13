@@ -287,8 +287,11 @@ class ApiService {
 
   // Show Fullscreen Image Preview Modal with Close (X) button at top-right
   static void showImagePreviewDialog(BuildContext context, String? rawImageUrl) {
-    if (rawImageUrl == null || rawImageUrl.isEmpty) return;
-    final fullUrl = getFullImageUrl(rawImageUrl);
+    final imgPath = (rawImageUrl ?? '').trim();
+    if (imgPath.isEmpty) return;
+
+    final isAsset = imgPath.startsWith('assets/');
+    final fullUrl = isAsset ? imgPath : getFullImageUrl(imgPath);
 
     showDialog(
       context: context,
@@ -319,36 +322,27 @@ class ApiService {
                 panEnabled: true,
                 minScale: 0.8,
                 maxScale: 4.0,
-                child: Image.network(
-                  fullUrl,
-                  fit: BoxFit.contain,
-                  loadingBuilder: (c, child, progress) {
-                    if (progress == null) return child;
-                    return Container(
-                      height: 280,
-                      width: double.infinity,
-                      color: Colors.black87,
-                      child: const Center(
-                        child: CircularProgressIndicator(color: Color(0xFFD8A54A)),
-                      ),
-                    );
-                  },
-                  errorBuilder: (c, e, s) => Container(
-                    padding: const EdgeInsets.all(32),
-                    color: Colors.black87,
-                    child: const Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.broken_image_outlined, size: 64, color: Colors.white60),
-                        SizedBox(height: 12),
-                        Text(
-                          'Unable to load image preview',
-                          style: TextStyle(color: Colors.white70, fontSize: 13),
+                child: isAsset
+                    ? Image.asset(imgPath, fit: BoxFit.contain)
+                    : Image.network(
+                        fullUrl,
+                        fit: BoxFit.contain,
+                        loadingBuilder: (c, child, progress) {
+                          if (progress == null) return child;
+                          return Container(
+                            height: 280,
+                            width: double.infinity,
+                            color: Colors.black87,
+                            child: const Center(
+                              child: CircularProgressIndicator(color: Color(0xFFD8A54A)),
+                            ),
+                          );
+                        },
+                        errorBuilder: (c, e, s) => Image.asset(
+                          'assets/images/artisan_art.jpg',
+                          fit: BoxFit.contain,
                         ),
-                      ],
-                    ),
-                  ),
-                ),
+                      ),
               ),
             ),
 
