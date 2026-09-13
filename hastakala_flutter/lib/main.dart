@@ -1894,14 +1894,7 @@ class _AddProductPageState extends State<AddProductPage> {
   @override
   Widget build(BuildContext context) {
     if (processing) {
-      return AIProcessingPage(
-        onComplete: () {
-          setState(() {
-            processing = false;
-            step = 2; // Jump to Review Phase
-          });
-        },
-      );
+      return const AIProcessingPage();
     }
 
     return SafeArea(
@@ -2829,32 +2822,32 @@ class _AddProductPageState extends State<AddProductPage> {
   }
 }
 
-class AIProcessingPage extends StatefulWidget {
-  final VoidCallback onComplete;
-  const AIProcessingPage({super.key, required this.onComplete});
-  @override State<AIProcessingPage> createState() => _AIProcessingPageState();
-}
+class AIProcessingPage extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  const AIProcessingPage({
+    super.key,
+    this.title = 'Hastakala AI Working...',
+    this.subtitle = 'Creating e-commerce photos & catalog',
+  });
 
-class _AIProcessingPageState extends State<AIProcessingPage> {
   @override
-  void initState() {
-    super.initState();
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) widget.onComplete();
-    });
-  }
-
-  @override Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) => Scaffold(
     backgroundColor: AppColors.deepWine,
-    body: const Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-      Icon(Icons.auto_awesome, size: 80, color: AppColors.gold),
-      SizedBox(height: 24),
-      Text('Hastakala AI Working...', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.white)),
-      SizedBox(height: 10),
-      Text('Creating e-commerce photos & catalog', style: TextStyle(color: Colors.white70)),
-      SizedBox(height: 28),
-      CircularProgressIndicator(color: AppColors.gold),
-    ])),
+    body: Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.auto_awesome, size: 80, color: AppColors.gold),
+          const SizedBox(height: 24),
+          Text(title, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.white)),
+          const SizedBox(height: 10),
+          Text(subtitle, style: const TextStyle(color: Colors.white70)),
+          const SizedBox(height: 28),
+          const CircularProgressIndicator(color: AppColors.gold),
+        ],
+      ),
+    ),
   );
 }
 
