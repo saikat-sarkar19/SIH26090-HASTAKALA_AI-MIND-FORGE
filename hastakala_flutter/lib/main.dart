@@ -1698,16 +1698,14 @@ class _AddProductPageState extends State<AddProductPage> {
   );
 
   // Persistent Controllers across all phases
-  final TextEditingController voiceTextController = TextEditingController(
-    text: "Handwoven Banarasi Cotton Saree with authentic Zari embroidery motifs"
-  );
+  final TextEditingController voiceTextController = TextEditingController();
 
-  final TextEditingController titleCtrl = TextEditingController(text: "Handwoven Banarasi Silk & Cotton Saree");
-  final TextEditingController descEnCtrl = TextEditingController(text: "Exquisite handwoven Banarasi saree handcrafted by traditional master weavers.");
-  final TextEditingController descHiCtrl = TextEditingController(text: "पारंपरिक मास्टर बुनकरों द्वारा हस्तनिर्मित उत्कृष्ट हथकरघा बनारसी साड़ी।");
-  final TextEditingController catCtrl = TextEditingController(text: "Textiles  ›  Sarees");
-  final TextEditingController matCtrl = TextEditingController(text: "Pure Handloom Cotton & Zari Thread");
-  final TextEditingController tagsCtrl = TextEditingController(text: "Handloom • Saree • Traditional • Ethnic Wear • Banarasi");
+  final TextEditingController titleCtrl = TextEditingController();
+  final TextEditingController descEnCtrl = TextEditingController();
+  final TextEditingController descHiCtrl = TextEditingController();
+  final TextEditingController catCtrl = TextEditingController();
+  final TextEditingController matCtrl = TextEditingController();
+  final TextEditingController tagsCtrl = TextEditingController();
 
   // Dynamic Pricing Sliders State
   double materialCost = 450.0;
@@ -2052,12 +2050,14 @@ class _AddProductPageState extends State<AddProductPage> {
     if (step == 0) {
       setState(() => step = 1);
     } else if (step == 1) {
-      // If voice text provided and catalog not generated yet, generate catalog automatically
-      if (voiceTextController.text.trim().isNotEmpty && generatedCatalogResult == null) {
+      if (generatedCatalogResult == null) {
         setState(() => processing = true);
         final imgUrl = enhancedImageResult?['enhanced_image_url'] ?? enhancedImageResult?['raw_image_url'] ?? '';
+        final voiceText = voiceTextController.text.trim().isNotEmpty
+            ? voiceTextController.text.trim()
+            : "Handcrafted Indian artisan product";
         final catalog = await ApiService.generateCatalog(
-          voiceTextController.text,
+          voiceText,
           language: selectedLanguage,
           imageUrl: imgUrl,
         );
@@ -2407,6 +2407,14 @@ class _AddProductPageState extends State<AddProductPage> {
           selectedImageBytes = bytes;
           originalFileName = picked.name;
           isEnhancingPhoto = true;
+          generatedCatalogResult = null;
+          voiceTextController.clear();
+          titleCtrl.clear();
+          descEnCtrl.clear();
+          descHiCtrl.clear();
+          catCtrl.clear();
+          matCtrl.clear();
+          tagsCtrl.clear();
         });
         final result = await ApiService.enhanceImage(
           bytes,
