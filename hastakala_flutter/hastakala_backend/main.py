@@ -116,6 +116,8 @@ class ProfileUpdateRequest(BaseModel):
 
 # --- Routes ---
 
+@app.get("/")
+@app.get("/api")
 @app.get("/api/info")
 def api_info():
     return {
@@ -273,25 +275,9 @@ def get_due_orders(
 ):
     return db_get_due_orders(artisan_id=artisan_id, artisan_username=artisan_username)
 
-WEB_DIR = Path(__file__).resolve().parent.parent / "build" / "web"
-
-@app.get("/{full_path:path}")
-def serve_flutter_spa(full_path: str = ""):
-    if full_path.startswith("api/") or full_path.startswith("uploads/"):
-        raise HTTPException(status_code=404, detail="API endpoint not found")
-    
-    file_path = WEB_DIR / full_path
-    if full_path and file_path.exists() and file_path.is_file():
-        return FileResponse(file_path)
-    
-    index_file = WEB_DIR / "index.html"
-    if index_file.exists():
-        return FileResponse(index_file)
-    
-    raise HTTPException(status_code=404, detail="Frontend index.html not found")
-
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("hastakala_backend.main:app", host=HOST, port=PORT, reload=True)
+
 
 
