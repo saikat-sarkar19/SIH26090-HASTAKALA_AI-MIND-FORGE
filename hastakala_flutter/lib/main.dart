@@ -1197,7 +1197,7 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         backgroundColor: AppColors.cream,
         elevation: 0,
-        title: Text(index == 0 ? 'Artisan Business Hub 🎨' : index == 1 ? 'My Product Catalog' : index == 2 ? 'Add Craft' : index == 3 ? 'B2B Leads & Buyers' : 'Artisan Profile', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        title: Text(index == 0 ? 'Artisan Business Hub 🎨' : index == 1 ? 'My Product Catalog' : index == 2 ? 'Add Craft' : index == 3 ? 'B2B Enquiries 📩' : 'Artisan Profile', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
       ),
       body: pages[index],
       bottomNavigationBar: NavigationBar(
@@ -1207,7 +1207,7 @@ class _HomeScreenState extends State<HomeScreen> {
           NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Home'),
           NavigationDestination(icon: Icon(Icons.inventory_2_outlined), selectedIcon: Icon(Icons.inventory_2), label: 'Products'),
           NavigationDestination(icon: Icon(Icons.add_circle_outline), selectedIcon: Icon(Icons.add_circle), label: 'Add Craft'),
-          NavigationDestination(icon: Icon(Icons.handshake_outlined), selectedIcon: Icon(Icons.handshake), label: 'Buyers'),
+          NavigationDestination(icon: Icon(Icons.mail_outline_rounded), selectedIcon: Icon(Icons.mark_email_read), label: 'Enquiries'),
           NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Profile'),
         ],
       ),
@@ -1229,6 +1229,7 @@ class _DashboardPageState extends State<DashboardPage> {
     'ai_opportunity': {'title': 'Handloom demand is high', 'subtitle': 'Add 2 new designs to attract buyers.'}
   };
   List<dynamic> dueOrders = [];
+  List<dynamic> enquiries = [];
   bool backendConnected = false;
   bool loading = true;
 
@@ -1246,11 +1247,13 @@ class _DashboardPageState extends State<DashboardPage> {
         : int.tryParse(currentArtisanSession?['id']?.toString() ?? '');
     final String? artisanUsername = currentArtisanSession?['username']?.toString();
     final orders = await ApiService.getDueOrders(artisanId: artisanId, artisanUsername: artisanUsername);
+    final enquiryList = await ApiService.getEnquiries(artisanId: artisanId, artisanUsername: artisanUsername);
     if (mounted) {
       setState(() {
         backendConnected = connected;
         stats = data;
         dueOrders = orders;
+        enquiries = enquiryList;
         loading = false;
       });
     }
@@ -1734,24 +1737,34 @@ class _DashboardPageState extends State<DashboardPage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Orders & Shipments', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.wine)),
-              if (dueOrders.isNotEmpty)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.green.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    '${dueOrders.length} Pending Dispatch',
-                    style: const TextStyle(color: AppColors.green, fontWeight: FontWeight.bold, fontSize: 11),
+              const Text('Recent Enquiries 📩', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.wine)),
+              if (enquiries.isNotEmpty)
+                GestureDetector(
+                  onTap: () => widget.onNavigateTab?.call(3),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.green.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${enquiries.length} Active Lead${enquiries.length > 1 ? 's' : ''}',
+                      style: const TextStyle(color: AppColors.green, fontWeight: FontWeight.bold, fontSize: 11),
+                    ),
                   ),
                 ),
             ],
           ),
           const SizedBox(height: 12),
-          if (dueOrders.isNotEmpty) ...[
-            ...dueOrders.map((order) {
+          if (enquiries.isNotEmpty) ...[
+            ...enquiries.take(3).map((enq) {
+              final status = enq['status'] ?? 'New Lead';
+              final qty = enq['order_quantity'] ?? 50;
+              final price = enq['offer_price']?.toInt() ?? 450;
+              final totalVal = qty * price;
+              final prodTitle = enq['product_title'] ?? 'Artisan Craft';
+              final businessName = enq['business_name'] ?? enq['buyer_name'] ?? 'Wholesale Buyer';
+
               return Card(
                 margin: const EdgeInsets.only(bottom: 12),
                 shape: RoundedRectangleBorder(
@@ -1760,48 +1773,61 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
                 elevation: 0,
                 color: Colors.white,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.business, color: AppColors.wine, size: 20),
-                              const SizedBox(width: 8),
-                              Text(
-                                order['company_name'] ?? 'B2B Client',
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.wine),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () => widget.onNavigateTab?.call(3),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.handshake_outlined, color: AppColors.wine, size: 20),
+                                const SizedBox(width: 8),
+                                Text(
+                                  businessName,
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.wine),
+                                ),
+                              ],
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: AppColors.gold.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(8),
                               ),
-                            ],
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: AppColors.gold.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(8),
+                              child: Text(
+                                status,
+                                style: const TextStyle(color: AppColors.wine, fontWeight: FontWeight.bold, fontSize: 11),
+                              ),
                             ),
-                            child: Text(
-                              order['status'] ?? 'Due',
-                              style: const TextStyle(color: AppColors.wine, fontWeight: FontWeight.bold, fontSize: 11),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          'Enquiry for $qty pcs of $prodTitle',
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.ink),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              '📍 ${enq['buyer_location'] ?? 'India'} • ${enq['buyer_type'] ?? 'Buyer'}',
+                              style: const TextStyle(fontSize: 12, color: AppColors.muted),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        '${order['quantity_due']} products due to be shipped to ${order['company_name']}',
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.ink),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Item: ${order['product_title']} | Dispatch By: ${order['dispatch_by']}',
-                        style: const TextStyle(fontSize: 12, color: AppColors.muted),
-                      ),
-                    ],
+                            Text(
+                              'Total: ₹$totalVal',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.green),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               );
@@ -1815,7 +1841,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: const Color(0xFFE5D5C1)),
                 boxShadow: [
-                  BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2)),
+                  BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2)),
                 ],
               ),
               child: Column(
@@ -1843,12 +1869,12 @@ class _DashboardPageState extends State<DashboardPage> {
                   ),
                   const SizedBox(height: 14),
                   const Text(
-                    'You Have No Pending Orders Yet',
+                    'You Have No Pending Enquiries Yet',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.wine),
                   ),
                   const SizedBox(height: 6),
                   const Text(
-                    'Once B2B buyers place bulk orders for your handcrafted products, your upcoming shipments will appear here.',
+                    'Once B2B buyers send enquiries for your handcrafted products, your direct buyer leads will appear here.',
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 13, color: AppColors.ink, height: 1.35),
                   ),
@@ -4750,99 +4776,11 @@ class _AssistantPageState extends State<AssistantPage> {
   );
 }
 
-class BuyersPage extends StatefulWidget {
+class BuyersPage extends StatelessWidget {
   const BuyersPage({super.key});
-  @override State<BuyersPage> createState() => _BuyersPageState();
-}
-
-class _BuyersPageState extends State<BuyersPage> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-  List<dynamic> buyers = [];
-  bool loading = true;
 
   @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    _loadBuyers();
+  Widget build(BuildContext context) {
+    return ArtisanEnquiriesPage(artisanSession: currentArtisanSession);
   }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _loadBuyers() async {
-    final list = await ApiService.getBuyers();
-    if (mounted) {
-      setState(() {
-        buyers = list;
-        loading = false;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: AppColors.cream,
-    appBar: AppBar(
-      title: const Text('B2B Leads & Buyers', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-      backgroundColor: AppColors.cream,
-      elevation: 0,
-      bottom: TabBar(
-        controller: _tabController,
-        labelColor: AppColors.wine,
-        unselectedLabelColor: AppColors.muted,
-        indicatorColor: AppColors.wine,
-        indicatorWeight: 3,
-        tabs: const [
-          Tab(text: 'Received Enquiries 📩', icon: Icon(Icons.mail_outline_rounded, size: 18)),
-          Tab(text: 'Verified Buyers 🏢', icon: Icon(Icons.verified_outlined, size: 18)),
-        ],
-      ),
-    ),
-    body: TabBarView(
-      controller: _tabController,
-      children: [
-        ArtisanEnquiriesPage(artisanSession: currentArtisanSession),
-        loading
-            ? const Center(child: CircularProgressIndicator(color: AppColors.wine))
-            : ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: buyers.length,
-                itemBuilder: (_, i) {
-                  final b = buyers[i];
-                  return Card(
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      side: const BorderSide(color: Color(0xFFECE3DD)),
-                    ),
-                    margin: const EdgeInsets.only(bottom: 12),
-                    child: ListTile(
-                      contentPadding: const EdgeInsets.all(14),
-                      leading: const CircleAvatar(backgroundColor: AppColors.wine, child: Icon(Icons.store, color: Colors.white)),
-                      title: Text(b['organization_name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
-                      subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        const SizedBox(height: 4),
-                        Text('${b['buyer_type']} • ${b['location']}'),
-                        const SizedBox(height: 4),
-                        Text('Target: ${b['target_category']}', style: const TextStyle(fontSize: 11, color: AppColors.muted)),
-                        Text('Min Order: ${b['min_order_qty']} units', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.green)),
-                      ]),
-                      trailing: ElevatedButton(
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Connecting to ${b['organization_name']}...')));
-                        },
-                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.wine, foregroundColor: Colors.white),
-                        child: const Text('Connect'),
-                      ),
-                    ),
-                  );
-                },
-              ),
-      ],
-    ),
-  );
 }

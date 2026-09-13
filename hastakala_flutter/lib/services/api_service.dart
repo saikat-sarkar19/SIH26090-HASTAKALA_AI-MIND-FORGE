@@ -510,12 +510,15 @@ class ApiService {
     return [];
   }
 
-  static Future<bool> updateEnquiryStatus(int enquiryId, String newStatus) async {
+  static Future<bool> updateEnquiryStatus(int enquiryId, String newStatus, {String rejectionReason = ''}) async {
     try {
       final res = await http.patch(
         Uri.parse('$baseUrl/api/enquiries/$enquiryId/status'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'status': newStatus}),
+        body: jsonEncode({
+          'status': newStatus,
+          if (rejectionReason.isNotEmpty) 'rejection_reason': rejectionReason,
+        }),
       );
       return res.statusCode == 200;
     } catch (e) {

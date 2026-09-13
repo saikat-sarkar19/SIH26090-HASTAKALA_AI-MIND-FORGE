@@ -1159,14 +1159,24 @@ def db_get_product_enquiries(product_id: int = None, artisan_id: int = None, art
         conn.close()
         return [dict(r) for r in rows]
 
-def db_update_enquiry_status(enquiry_id: int, new_status: str) -> bool:
+def db_update_enquiry_status(enquiry_id: int, new_status: str, rejection_reason: str = "") -> bool:
+    update_dict = {"status": new_status}
+    if rejection_reason:
+        update_dict["rejection_reason"] = rejection_reason
     if _db_type == "MongoDB" and _mongo_db is not None:
-        res = _mongo_db.enquiries.update_one({"id": enquiry_id}, {"$set": {"status": new_status}})
-        return res.modified_count > 0
+        res = _mongo_db.enquiries.update_one({"id": enquiry_id}, {"$set": update_dict})
+        return res.modified_count > 0 or res.matched_count > 0
     else:
         conn = get_sqlite_conn()
         cursor = conn.cursor()
-        cursor.execute("UPDATE enquiries SET status = ? WHERE id = ?", (new_status, enquiry_id))
+        if rejection_reason:
+            try:
+                cursor.execute("ALTER TABLE enquiries ADD COLUMN rejection_reason TEXT")
+            except Exception:
+                pass
+            cursor.execute("UPDATE enquiries SET status = ?, rejection_reason = ? WHERE id = ?", (new_status, rejection_reason, enquiry_id))
+        else:
+            cursor.execute("UPDATE enquiries SET status = ? WHERE id = ?", (new_status, enquiry_id))
         conn.commit()
         success = cursor.rowcount > 0
         conn.close()

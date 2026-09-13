@@ -216,32 +216,31 @@ class _BuyerOrdersPageState extends State<BuyerOrdersPage> {
                                   ),
                                 ),
                               ],
-                              const SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  const Icon(Icons.info_outline, size: 14, color: Color(0xFF3C9A68)),
-                                  const SizedBox(width: 6),
-                                  const Expanded(
-                                    child: Text(
-                                      'Artisan receives your contact info directly.',
-                                      style: TextStyle(fontSize: 11, color: Color(0xFF7D7478)),
-                                    ),
+                              if (status.toLowerCase() == 'rejected' && (enq['rejection_reason'] ?? '').toString().isNotEmpty) ...[
+                                const SizedBox(height: 8),
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red.shade50,
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(color: Colors.red.shade200),
                                   ),
-                                  OutlinedButton.icon(
-                                    style: OutlinedButton.styleFrom(
-                                      visualDensity: VisualDensity.compact,
-                                      side: const BorderSide(color: Color(0xFF7A0B2E)),
-                                    ),
-                                    onPressed: () {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(content: Text('Contact request sent to artisan for Enquiry #${enq['id']}')),
-                                      );
-                                    },
-                                    icon: const Icon(Icons.phone, size: 14, color: Color(0xFF7A0B2E)),
-                                    label: const Text('Contact', style: TextStyle(color: Color(0xFF7A0B2E), fontSize: 12, fontWeight: FontWeight.bold)),
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Icon(Icons.cancel_outlined, size: 16, color: Colors.red.shade700),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          'Artisan Rejection Reason: "${enq['rejection_reason']}"',
+                                          style: TextStyle(fontSize: 12, color: Colors.red.shade900, fontWeight: FontWeight.w600),
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ],
                           ),
                         ),

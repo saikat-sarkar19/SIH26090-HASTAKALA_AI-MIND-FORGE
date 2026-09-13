@@ -168,6 +168,7 @@ class EnquiryCreate(BaseModel):
 
 class EnquiryStatusUpdate(BaseModel):
     status: Optional[str] = None
+    rejection_reason: Optional[str] = None
 
 
 # --- Routes ---
@@ -376,10 +377,12 @@ def create_enquiry_endpoint(req: EnquiryCreate):
 def update_enquiry_status_endpoint(
     enquiry_id: int,
     req: Optional[EnquiryStatusUpdate] = None,
-    status: Optional[str] = Query(None)
+    status: Optional[str] = Query(None),
+    rejection_reason: Optional[str] = Query(None)
 ):
     new_status = (req.status if req and req.status else status) or "In Discussion"
-    success = db_update_enquiry_status(enquiry_id, new_status)
+    reason = (req.rejection_reason if req and req.rejection_reason else rejection_reason) or ""
+    success = db_update_enquiry_status(enquiry_id, new_status, rejection_reason=reason)
     if not success:
         raise HTTPException(status_code=404, detail="Enquiry not found or status update failed")
     return {"status": "success", "message": f"Status updated to '{new_status}'"}
