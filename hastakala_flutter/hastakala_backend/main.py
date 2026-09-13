@@ -139,6 +139,7 @@ def api_info():
 
 @app.get("/")
 @app.get("/index.html")
+@app.get("/api/index.py")
 def serve_index():
     index_path = WEB_DIR / "index.html"
     if index_path.exists():
@@ -349,7 +350,13 @@ def serve_version():
 
 @app.get("/{full_path:path}")
 def serve_spa_fallback(full_path: str):
-    if full_path.startswith("api/") or full_path.startswith("uploads/") or full_path == "docs" or full_path == "openapi.json":
+    clean_path = full_path.strip("/")
+    if clean_path in ("api/index.py", "index.py", ""):
+        index_path = WEB_DIR / "index.html"
+        if index_path.exists():
+            return FileResponse(index_path)
+
+    if (full_path.startswith("api/") and not full_path.startswith("api/index.py")) or full_path.startswith("uploads/") or full_path in ("docs", "openapi.json"):
         raise HTTPException(status_code=404, detail="API endpoint not found")
     
     target_file = WEB_DIR / full_path

@@ -19,6 +19,11 @@ class TestHastakalaBackend(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("html", response.text.lower())
 
+    def test_vercel_wrapper_endpoint(self):
+        response = self.client.get("/api/index.py")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("html", response.text.lower())
+
     def test_api_info_endpoint(self):
         response = self.client.get("/api/info")
         self.assertEqual(response.status_code, 200)
