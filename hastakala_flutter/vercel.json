@@ -1,25 +1,8 @@
 {
-  "outputDirectory": "build/web",
   "rewrites": [
     {
-      "source": "/api/(.*)",
-      "destination": "/api/index.py"
-    },
-    {
-      "source": "/uploads/(.*)",
-      "destination": "/api/index.py"
-    },
-    {
-      "source": "/docs",
-      "destination": "/api/index.py"
-    },
-    {
-      "source": "/openapi.json",
-      "destination": "/api/index.py"
-    },
-    {
       "source": "/(.*)",
-      "destination": "/index.html"
+      "destination": "/api/index.py"
     }
   ]
 }
