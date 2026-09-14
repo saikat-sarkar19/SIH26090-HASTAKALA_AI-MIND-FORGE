@@ -2231,11 +2231,31 @@ class _AddProductPageState extends State<AddProductPage> {
     });
   }
 
+  Timer? _titleTranslationDebounce;
+
+  void _onTitleChanged(String val) {
+    if (val.runes.any((r) => r > 127)) {
+      _titleTranslationDebounce?.cancel();
+      _titleTranslationDebounce = Timer(const Duration(milliseconds: 600), () async {
+        final res = await ApiService.translateText(val, sourceLang: 'auto', targetLang: 'en');
+        if (mounted && res != null && res['translated_text'] != null) {
+          final trans = res['translated_text'].toString().trim();
+          if (trans.isNotEmpty && !trans.runes.any((r) => r > 127)) {
+            setState(() {
+              titleCtrl.text = trans;
+            });
+          }
+        }
+      });
+    }
+  }
+
   @override
   void dispose() {
     moqCtrl.dispose();
     _enTranslationDebounce?.cancel();
     _regionalTranslationDebounce?.cancel();
+    _titleTranslationDebounce?.cancel();
     super.dispose();
   }
 
@@ -2723,8 +2743,10 @@ class _AddProductPageState extends State<AddProductPage> {
       category = 'Bamboo & Cane';
       materials = 'Organic Bamboo & Natural Fibers';
       tags = 'Handmade • Bamboo Craft • Storage • Sustainable • Eco-Friendly';
-    } else if (lowerText.contains('pot') || lowerText.contains('matka') || lowerText.contains('vase') || lowerText.contains('clay') || lowerText.contains('terracotta') || lowerText.contains('pitcher') || lowerText.contains('মাটি') || lowerText.contains('মাটલું') || lowerText.contains('मिट्टी')) {
-      title = 'Handcrafted Terracotta Artisan Pot';
+    } else if (lowerText.contains('pot') || lowerText.contains('matka') || lowerText.contains('vase') || lowerText.contains('clay') || lowerText.contains('terracotta') || lowerText.contains('pitcher') || lowerText.contains('মাটি') || lowerText.contains('মাটલું') || lowerText.contains('मिट्टी') || lowerText.contains('fuldani') || lowerText.contains('ফুলদানি') || lowerText.contains('ফুলদানির') || lowerText.contains('फूलदान')) {
+      title = (lowerText.contains('vase') || lowerText.contains('fuldani') || lowerText.contains('ফুলদানি') || lowerText.contains('ফুলদানির') || lowerText.contains('फूलदान'))
+          ? 'Handcrafted Terracotta Clay Flower Vase'
+          : 'Handcrafted Terracotta Artisan Pot';
       artType = 'Terracotta Pottery';
       category = 'Kitchen & Dining  ›  Terracotta Pottery';
       materials = 'Natural Bio-Clay & Eco-Friendly Terracotta';
@@ -2798,6 +2820,28 @@ class _AddProductPageState extends State<AddProductPage> {
     catalog ??= _generateLocalFallbackCatalog(text);
 
     if (mounted) {
+      final rawTitle = (catalog['title'] ?? '').toString().trim();
+      if (rawTitle.runes.any((r) => r > 127)) {
+        try {
+          final transRes = await ApiService.translateText(rawTitle, sourceLang: 'auto', targetLang: 'en');
+          if (transRes != null && transRes['translated_text'] != null) {
+            final trans = transRes['translated_text'].toString().trim();
+            if (trans.isNotEmpty && !trans.runes.any((r) => r > 127)) {
+              catalog['title'] = trans.toLowerCase().startsWith('handcrafted') ? trans : 'Handcrafted $trans';
+            } else {
+              final craft = (catalog['type_of_art'] ?? 'Artisan Craft').toString().trim();
+              catalog['title'] = 'Handcrafted $craft';
+            }
+          } else {
+            final craft = (catalog['type_of_art'] ?? 'Artisan Craft').toString().trim();
+            catalog['title'] = 'Handcrafted $craft';
+          }
+        } catch (_) {
+          final craft = (catalog['type_of_art'] ?? 'Artisan Craft').toString().trim();
+          catalog['title'] = 'Handcrafted $craft';
+        }
+      }
+
       _syncCatalogToControllers(catalog);
       generatedCatalogResult = catalog;
       setState(() {
@@ -3603,7 +3647,7 @@ class _AddProductPageState extends State<AddProductPage> {
               ),
             ),
           const SizedBox(height: 16),
-          _editableField('Product Name', titleCtrl, hintText: 'e.g. Handcrafted Ceramic Teacup'),
+          _editableField('Product Name', titleCtrl, onChanged: _onTitleChanged, hintText: 'e.g. Handcrafted Ceramic Teacup'),
           _editableField('Type of Art / Craft Heritage', artTypeCtrl, hintText: 'e.g. Terracotta Pottery, Handloom Weaving'),
           _editableField('Category', catCtrl, hintText: 'e.g. Pottery & Clay, Handloom & Textiles'),
           _editableField('English Description (SEO)', descEnCtrl, maxLines: 4, onChanged: _onEnChanged, hintText: 'Detailed e-commerce product description in English'),

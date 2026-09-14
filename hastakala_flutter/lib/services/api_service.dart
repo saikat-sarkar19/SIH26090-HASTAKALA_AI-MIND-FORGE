@@ -115,7 +115,7 @@ class ApiService {
               'image_base64': imageBase64.isNotEmpty ? imageBase64 : (imageUrl.startsWith('data:') ? imageUrl : ''),
             }),
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 35));
       if (res.statusCode == 200) {
         return jsonDecode(res.body);
       }
