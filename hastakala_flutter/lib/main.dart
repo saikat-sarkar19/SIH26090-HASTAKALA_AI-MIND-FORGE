@@ -2416,18 +2416,24 @@ class _AddProductPageState extends State<AddProductPage> {
 
   void _syncCatalogToControllers(Map<String, dynamic> catalog) {
     if (catalog['title'] != null && catalog['title'].toString().isNotEmpty) {
-      final t = catalog['title'].toString();
-      titleCtrl.text = t;
+      final t = catalog['title'].toString().trim();
       if (t.runes.any((r) => r > 127)) {
+        final craftType = (catalog['type_of_art'] ?? '').toString().trim();
+        titleCtrl.text = craftType.isNotEmpty ? 'Handcrafted $craftType' : 'Handcrafted Artisan Product';
         ApiService.translateText(t, sourceLang: 'auto', targetLang: 'en').then((res) {
-          if (res != null && res['translated_text'] != null && res['translated_text'].toString().trim().isNotEmpty) {
-            if (mounted) {
-              setState(() {
-                titleCtrl.text = res['translated_text'].toString().trim();
-              });
+          if (res != null && res['translated_text'] != null) {
+            final trans = res['translated_text'].toString().trim();
+            if (trans.isNotEmpty && !trans.runes.any((r) => r > 127)) {
+              if (mounted) {
+                setState(() {
+                  titleCtrl.text = trans;
+                });
+              }
             }
           }
         });
+      } else {
+        titleCtrl.text = t;
       }
     }
     if (catalog['description_en'] != null && catalog['description_en'].toString().isNotEmpty) {
@@ -2680,7 +2686,7 @@ class _AddProductPageState extends State<AddProductPage> {
   }
 
   Map<String, dynamic> _generateLocalFallbackCatalog(String userText) {
-    final lowerText = userText.toLowerCase();
+    final lowerText = '${userText.toLowerCase()} ${translatedEnglishText.toLowerCase()}';
     String title = 'Handcrafted Artisan Product';
     String artType = 'Traditional Indian Craft';
     String category = 'Pottery & Clay';
@@ -2693,36 +2699,51 @@ class _AddProductPageState extends State<AddProductPage> {
       category = 'Kitchen & Dining  ›  Artisan Drinkware & Bottles';
       materials = 'Copper / Bio-Clay / Carved Wood';
       tags = 'Bottle • Drinkware • Handmade • Eco-Friendly • Artisanal • Sustainable';
-    } else if (lowerText.contains('saree') || lowerText.contains('suit') || lowerText.contains('cloth') || lowerText.contains('loom') || lowerText.contains('weave')) {
+    } else if (lowerText.contains('saree') || lowerText.contains('saari') || lowerText.contains('suit') || lowerText.contains('cloth') || lowerText.contains('loom') || lowerText.contains('weave') || lowerText.contains('साड़ी') || lowerText.contains('শাড়ি') || lowerText.contains('சேலை')) {
       title = 'Handwoven Heritage Silk Saree';
       artType = 'Handloom Weaving';
       category = 'Handloom & Textiles';
       materials = 'Pure Silk & Zari Thread';
-    } else if (lowerText.contains('wood') || lowerText.contains('carv')) {
+      tags = 'Handloom • Saree • Heritage Weave • Artisanal • Sustainable';
+    } else if (lowerText.contains('wood') || lowerText.contains('carv') || lowerText.contains('लकड़ी') || lowerText.contains('কাঠ') || lowerText.contains('લાકડા')) {
       title = 'Handcrafted Royal Wood Carving';
       artType = 'Wood Carving';
       category = 'Wood Carving & Timber';
       materials = 'Teak Wood & Sheesham';
-    } else if (lowerText.contains('metal') || lowerText.contains('brass') || lowerText.contains('dokra')) {
+      tags = 'Woodcraft • Hand-Carved • Sheesham • Heritage • Sustainable';
+    } else if (lowerText.contains('metal') || lowerText.contains('brass') || lowerText.contains('dokra') || lowerText.contains('ধাতু') || lowerText.contains('पितल') || lowerText.contains('धातु')) {
       title = 'Handmade Dokra Metal Craft';
       artType = 'Dokra Metal Craft';
       category = 'Metal Craft & Brassware';
       materials = 'Brass & Bell Metal Alloys';
-    } else if (lowerText.contains('bamboo') || lowerText.contains('basket') || lowerText.contains('cane')) {
+      tags = 'Metal Craft • Brassware • Dokra Art • Ethnic • Heritage';
+    } else if (lowerText.contains('bamboo') || lowerText.contains('basket') || lowerText.contains('cane') || lowerText.contains('বাঁশ') || lowerText.contains('ঝুড়ি') || lowerText.contains('टोकरी') || lowerText.contains('बांस') || lowerText.contains('વાંસ')) {
       title = 'Eco-Friendly Bamboo Basket Craft';
       artType = 'Bamboo & Cane Craft';
       category = 'Bamboo & Cane';
       materials = 'Organic Bamboo & Natural Fibers';
-    } else if (lowerText.contains('pot') || lowerText.contains('matka') || lowerText.contains('vase') || lowerText.contains('clay') || lowerText.contains('terracotta')) {
+      tags = 'Handmade • Bamboo Craft • Storage • Sustainable • Eco-Friendly';
+    } else if (lowerText.contains('pot') || lowerText.contains('matka') || lowerText.contains('vase') || lowerText.contains('clay') || lowerText.contains('terracotta') || lowerText.contains('pitcher') || lowerText.contains('মাটি') || lowerText.contains('মাটલું') || lowerText.contains('मिट्टी')) {
       title = 'Handcrafted Terracotta Artisan Pot';
       artType = 'Terracotta Pottery';
       category = 'Kitchen & Dining  ›  Terracotta Pottery';
       materials = 'Natural Bio-Clay & Eco-Friendly Terracotta';
+      tags = 'Pottery • Handcrafted • Bio-Clay • Eco-Friendly • Artisanal';
     } else {
-      title = userText.trim().isNotEmpty ? (userText.length > 30 ? '${userText.substring(0, 30)}...' : userText) : 'Handcrafted Artisan Craft';
+      if (translatedEnglishText.trim().isNotEmpty && !translatedEnglishText.runes.any((r) => r > 127)) {
+        final words = translatedEnglishText.trim().split(RegExp(r'\s+')).take(4).join(' ');
+        title = 'Handcrafted $words';
+      } else {
+        title = 'Handcrafted Heritage Indian Craft';
+      }
       artType = 'Traditional Indian Craft';
       category = 'Artisanal Handicrafts  ›  Heritage Crafts';
       materials = 'Natural Eco-Friendly Materials';
+    }
+
+    // Strict guarantee: title must NEVER contain non-ASCII/regional script characters!
+    if (title.runes.any((r) => r > 127)) {
+      title = 'Handcrafted Heritage Indian Craft';
     }
 
     final descEn = 'Exquisite $title handcrafted by master Indian artisans. Created with authentic traditional techniques, highlighting regional cultural heritage, premium artisanal texture, and sustainable eco-friendly craftsmanship for wholesale buyers.';

@@ -214,7 +214,7 @@ def build_high_quality_english_description(keywords: str, translated_en: str, de
             )
         },
         {
-            'keys': ['basket', 'tokri', 'bamboo', 'baans', 'cane', 'jute', 'storage', 'box', 'tray', 'planter'],
+            'keys': ['basket', 'tokri', 'bamboo', 'baans', 'cane', 'jute', 'storage', 'box', 'tray', 'planter', 'বাঁশ', 'ঝুড়ি', 'टोकरी', 'बांस', 'વાંસ'],
             'category': 'Home & Living  ›  Bamboo & Cane Craft',
             'materials': '100% Natural Seasoned Bamboo & Sustainable Cane',
             'tags': 'Handmade • Bamboo Craft • Storage • Sustainable • Eco-Friendly • Rural Art',
@@ -226,7 +226,7 @@ def build_high_quality_english_description(keywords: str, translated_en: str, de
             )
         },
         {
-            'keys': ['wood', 'lakdi', 'carving', 'sheesham', 'wooden', 'toy', 'statue', 'sculpture', 'furniture', 'coaster', 'board'],
+            'keys': ['wood', 'lakdi', 'carving', 'sheesham', 'wooden', 'toy', 'statue', 'sculpture', 'furniture', 'coaster', 'board', 'लकड़ी', 'হস্তकला', 'लाकडावर', 'மர'],
             'category': 'Handicrafts  ›  Wood Craft & Carvings',
             'materials': 'Seasoned Sheesham Wood & Organic Wax Finish',
             'tags': 'Woodcraft • Hand-Carved • Sheesham • Heritage • Wooden Decor • Sustainable',
@@ -238,7 +238,7 @@ def build_high_quality_english_description(keywords: str, translated_en: str, de
             )
         },
         {
-            'keys': ['brass', 'pittal', 'metal', 'dokra', 'bell metal', 'copper', 'statue', 'idol', 'figurine', 'bronze', 'lamp', 'diya'],
+            'keys': ['brass', 'pittal', 'metal', 'dokra', 'bell metal', 'copper', 'statue', 'idol', 'figurine', 'bronze', 'lamp', 'diya', 'ধাতু', 'পিতল', 'धातु', 'पीतल'],
             'category': 'Handicrafts  ›  Metal Craft & Dokra Art',
             'materials': 'Solid Brass & Antique Bell Metal Bronze',
             'tags': 'Metal Craft • Brassware • Dokra Art • Ethnic • Heritage • Hand-Cast',
@@ -279,8 +279,13 @@ def build_high_quality_english_description(keywords: str, translated_en: str, de
         materials = matched['materials']
         tags = matched['tags']
     else:
-        clean_name = re.sub(r'[^\w\s]', '', raw_text).title().strip()
-        item_label = clean_name if clean_name else "Artisan Product"
+        candidate_en = (translated_en or "").strip()
+        clean_name = re.sub(r'[^\x00-\x7F]+', ' ', candidate_en).strip()
+        clean_name = re.sub(r'[^\w\s]', '', clean_name).title().strip()
+        if not clean_name or len(clean_name) < 3 or any(ord(c) > 127 for c in clean_name):
+            item_label = "Indian Artisan Craft"
+        else:
+            item_label = " ".join(clean_name.split()[:4])
         title = f"Handcrafted {found_color.title() + ' ' if found_color else ''}{item_label}"
         desc_en = (
             f"Beautifully handcrafted by master Indian artisans, this bespoke creation showcases traditional craftsmanship and natural eco-friendly materials. "
@@ -290,6 +295,10 @@ def build_high_quality_english_description(keywords: str, translated_en: str, de
         category = "Artisanal Handicrafts  ›  Heritage Crafts"
         materials = "Natural Eco-Friendly Artisanal Materials"
         tags = "Handmade • Heritage • Artisanal • Indian Crafts • Sustainable"
+
+    # Strict English Title Guarantee
+    if any(ord(c) > 127 for c in title):
+        title = f"Handcrafted {found_color.title() + ' ' if found_color else ''}Heritage Indian Craft"
 
     return {
         "title": title,
@@ -430,9 +439,10 @@ def generate_with_gemini(
 Carefully inspect the provided product image. {artisan_voice_context}
 
 CRITICAL RULES:
-1. Base your classification PRIMARILY on what is actually visible in the image!
-2. Accurately identify and describe what is visible in the image (e.g., bottle, vase, pot, saree, wood carving, dokra metal sculpture, bamboo basket, etc.). Do NOT invent a pot or saree if the photo shows a bottle!
-3. Identify the authentic craft style, materials, shape, and visual attributes.
+1. The "title" MUST ALWAYS BE IN ENGLISH (only English letters, ASCII, never regional scripts like Bengali, Hindi, Gujarati, Tamil, etc.), no matter what language the voice note is in! Example: "Handcrafted Terracotta Clay Flower Vase", "Handwoven Banarasi Silk Saree", "Eco-Friendly Bamboo Basket".
+2. Base your classification PRIMARILY on what is actually visible in the image!
+3. Accurately identify and describe what is visible in the image (e.g., bottle, vase, pot, saree, wood carving, dokra metal sculpture, bamboo basket, etc.). Do NOT invent a pot or saree if the photo shows a bottle!
+4. Identify the authentic craft style, materials, shape, and visual attributes.
 
 Generate a structured JSON object with these exact keys:
 1. "title": An accurate 3-6 word English product title based on what is shown in the image.
@@ -563,13 +573,28 @@ def generate_catalog_from_voice_or_text(
     def _ensure_english_title(raw_t: str) -> str:
         if not raw_t:
             return "Handcrafted Artisan Product"
-        if detect_language_by_script(raw_t) != "en":
+        raw_t = raw_t.strip()
+        has_non_ascii = any(ord(c) > 127 for c in raw_t)
+        if has_non_ascii or detect_language_by_script(raw_t) != "en":
             try:
                 trans_t = translate_regional_text(raw_t, source_lang="auto", target_lang="en")
                 if trans_t and trans_t.get("translated_text"):
-                    return trans_t["translated_text"]
-            except Exception:
-                pass
+                    candidate = trans_t["translated_text"].strip()
+                    if candidate and not any(ord(c) > 127 for c in candidate):
+                        return candidate
+            except Exception as e:
+                print(f"Error translating title to English: {e}")
+
+            if translated_en and not any(ord(c) > 127 for c in translated_en):
+                words = [w for w in re.sub(r'[^\w\s]', '', translated_en).title().split() if len(w) > 2][:4]
+                if words:
+                    return f"Handcrafted {' '.join(words)}"
+
+            clean = re.sub(r'[^\x00-\x7F]+', ' ', raw_t)
+            clean = re.sub(r'\s+', ' ', clean).strip()
+            if len(clean) >= 4:
+                return clean
+            return "Handcrafted Indian Artisan Craft"
         return raw_t
 
     # 1. Primary: Gemini 3.8 Flash AI Multimodal Call
