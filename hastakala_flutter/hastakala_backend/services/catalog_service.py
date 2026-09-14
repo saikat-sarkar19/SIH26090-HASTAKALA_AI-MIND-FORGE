@@ -168,7 +168,19 @@ def build_high_quality_english_description(keywords: str, translated_en: str, de
     # Match Craft Profiles
     profiles = [
         {
-            'keys': ['vase', 'flower vase', 'fuldani', 'ফুলদানি', 'ফুলদানির', 'pot', 'matka', 'pitcher', 'vessel', 'clay', 'terracotta', 'pottery', 'bottle', 'jar', 'container', 'jug'],
+            'keys': ['bottle', 'flask', 'water bottle', 'jug', 'sipper', 'thermos', 'copper bottle'],
+            'category': 'Kitchen & Dining  ›  Artisan Drinkware & Bottles',
+            'materials': 'Pure Copper / Terracotta Clay / Carved Wood & Eco Seals',
+            'tags': 'Bottle • Drinkware • Handmade • Eco-Friendly • Artisanal • Sustainable',
+            'get_title': lambda col, item: f"Handcrafted {col.title() + ' ' if col else ''}Artisan Water Bottle",
+            'get_desc': lambda col, item, kw: (
+                f"Beautifully handcrafted by master Indian artisans, this ergonomic {col or 'artisan'} water bottle blends traditional health heritage with sleek modern utility. "
+                f"Featuring a leak-proof stopper lid and intricate hand-carved surface detailing, it provides a natural, eco-friendly way to store and carry fresh water. "
+                f"Ideal for daily hydration, office carry, or sustainable gifting, bringing handcrafted elegance to your wellness routine."
+            )
+        },
+        {
+            'keys': ['vase', 'flower vase', 'fuldani', 'ফুলদানি', 'ফুলদানির', 'pot', 'matka', 'pitcher', 'vessel', 'clay', 'terracotta', 'pottery', 'jar', 'container'],
             'category': 'Kitchen & Dining  ›  Terracotta Pottery',
             'materials': 'Natural Bio-Clay & Eco-Friendly Terracotta',
             'tags': 'Pottery • Handcrafted • Bio-Clay • Eco-Friendly • Artisanal • Sustainable',

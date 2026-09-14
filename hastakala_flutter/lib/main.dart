@@ -2547,7 +2547,13 @@ class _AddProductPageState extends State<AddProductPage> {
     String materials = 'Natural Bio-Clay & Organic Pigments';
     String tags = 'Handmade • Heritage • Artisanal • Sustainable • Indian Craft';
 
-    if (lowerText.contains('saree') || lowerText.contains('suit') || lowerText.contains('cloth') || lowerText.contains('loom') || lowerText.contains('weave')) {
+    if (lowerText.contains('bottle') || lowerText.contains('flask') || lowerText.contains('jug') || lowerText.contains('sipper') || lowerText.contains('drink') || lowerText.contains('copper')) {
+      title = 'Handcrafted Artisan Water Bottle';
+      artType = 'Handcrafted Bottle & Drinkware';
+      category = 'Kitchen & Dining  ›  Artisan Drinkware & Bottles';
+      materials = 'Copper / Bio-Clay / Carved Wood';
+      tags = 'Bottle • Drinkware • Handmade • Eco-Friendly • Artisanal • Sustainable';
+    } else if (lowerText.contains('saree') || lowerText.contains('suit') || lowerText.contains('cloth') || lowerText.contains('loom') || lowerText.contains('weave')) {
       title = 'Handwoven Heritage Silk Saree';
       artType = 'Handloom Weaving';
       category = 'Handloom & Textiles';
@@ -2567,8 +2573,16 @@ class _AddProductPageState extends State<AddProductPage> {
       artType = 'Bamboo & Cane Craft';
       category = 'Bamboo & Cane';
       materials = 'Organic Bamboo & Natural Fibers';
-    } else if (userText.isNotEmpty) {
-      title = userText.length > 25 ? '${userText.substring(0, 25)}...' : userText;
+    } else if (lowerText.contains('pot') || lowerText.contains('matka') || lowerText.contains('vase') || lowerText.contains('clay') || lowerText.contains('terracotta')) {
+      title = 'Handcrafted Terracotta Artisan Pot';
+      artType = 'Terracotta Pottery';
+      category = 'Kitchen & Dining  ›  Terracotta Pottery';
+      materials = 'Natural Bio-Clay & Eco-Friendly Terracotta';
+    } else {
+      title = userText.trim().isNotEmpty ? (userText.length > 30 ? '${userText.substring(0, 30)}...' : userText) : 'Handcrafted Artisan Product';
+      artType = 'Traditional Indian Craft';
+      category = 'Artisanal Handicrafts  ›  Heritage Crafts';
+      materials = 'Natural Eco-Friendly Materials';
     }
 
     final descEn = 'Exquisite $title handcrafted by master Indian artisans. Created with authentic traditional techniques, highlighting regional cultural heritage, premium artisanal texture, and sustainable eco-friendly craftsmanship for wholesale buyers.';
