@@ -2579,7 +2579,7 @@ class _AddProductPageState extends State<AddProductPage> {
       category = 'Kitchen & Dining  ›  Terracotta Pottery';
       materials = 'Natural Bio-Clay & Eco-Friendly Terracotta';
     } else {
-      title = userText.trim().isNotEmpty ? (userText.length > 30 ? '${userText.substring(0, 30)}...' : userText) : 'Handcrafted Artisan Product';
+      title = userText.trim().isNotEmpty ? (userText.length > 30 ? '${userText.substring(0, 30)}...' : userText) : 'Handcrafted Artisan Craft';
       artType = 'Traditional Indian Craft';
       category = 'Artisanal Handicrafts  ›  Heritage Crafts';
       materials = 'Natural Eco-Friendly Materials';
@@ -3022,7 +3022,12 @@ class _AddProductPageState extends State<AddProductPage> {
   Future<void> _pickAndEnhanceImage(ImageSource source) async {
     try {
       final picker = ImagePicker();
-      final picked = await picker.pickImage(source: source, imageQuality: 85);
+      final picked = await picker.pickImage(
+        source: source,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 80,
+      );
       if (picked != null) {
         final bytes = await picked.readAsBytes();
         final rawB64 = 'data:image/jpeg;base64,${base64Encode(bytes)}';
