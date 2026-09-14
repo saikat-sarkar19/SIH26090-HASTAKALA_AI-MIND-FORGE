@@ -2112,13 +2112,27 @@ class _AddProductPageState extends State<AddProductPage> {
   Timer? _regionalTranslationDebounce;
   bool _isTranslatingField = false;
 
+  static String? detectScriptCode(String text) {
+    for (final rune in text.runes) {
+      if (rune >= 0x0980 && rune <= 0x09FF) return 'bn'; // Bengali
+      if (rune >= 0x0A80 && rune <= 0x0AFF) return 'gu'; // Gujarati
+      if (rune >= 0x0B80 && rune <= 0x0BFF) return 'ta'; // Tamil
+      if (rune >= 0x0C00 && rune <= 0x0C7F) return 'te'; // Telugu
+      if (rune >= 0x0C80 && rune <= 0x0CFF) return 'kn'; // Kannada
+      if (rune >= 0x0D00 && rune <= 0x0D7F) return 'ml'; // Malayalam
+      if (rune >= 0x0A00 && rune <= 0x0A7F) return 'pa'; // Punjabi
+      if (rune >= 0x0900 && rune <= 0x097F) return 'hi'; // Devanagari (Hindi/Marathi)
+    }
+    return null;
+  }
+
   static const Map<String, Map<String, String>> _langInfoMap = {
     'hi': {'name': 'Hindi (हिंदी)', 'code': 'hi', 'label': 'Hindi Description (हिंदी विवरण)'},
     'hi-in': {'name': 'Hindi (हिंदी)', 'code': 'hi', 'label': 'Hindi Description (हिंदी विवरण)'},
     'hindi': {'name': 'Hindi (हिंदी)', 'code': 'hi', 'label': 'Hindi Description (हिंदी विवरण)'},
-    'bn': {'name': 'Bengali (বাংলা)', 'code': 'bn', 'label': 'Bengali Description (বাংলা विवरण)'},
-    'bn-in': {'name': 'Bengali (বাংলা)', 'code': 'bn', 'label': 'Bengali Description (বাংলা विवरण)'},
-    'bengali': {'name': 'Bengali (বাংলা)', 'code': 'bn', 'label': 'Bengali Description (বাংলা विवरण)'},
+    'bn': {'name': 'Bengali (বাংলা)', 'code': 'bn', 'label': 'Bengali Description (বাংলা বিবরণ)'},
+    'bn-in': {'name': 'Bengali (বাংলা)', 'code': 'bn', 'label': 'Bengali Description (বাংলা বিবরণ)'},
+    'bengali': {'name': 'Bengali (বাংলা)', 'code': 'bn', 'label': 'Bengali Description (বাংলা বিবরণ)'},
     'gu': {'name': 'Gujarati (ગુજરાતી)', 'code': 'gu', 'label': 'Gujarati Description (ગુજરાતી વિવરણ)'},
     'gu-in': {'name': 'Gujarati (ગુજરાતી)', 'code': 'gu', 'label': 'Gujarati Description (ગુજરાતી વિવરણ)'},
     'gujarati': {'name': 'Gujarati (ગુજરાતી)', 'code': 'gu', 'label': 'Gujarati Description (ગુજરાતી વિવરણ)'},
@@ -2148,6 +2162,11 @@ class _AddProductPageState extends State<AddProductPage> {
       searchStr = selectedLanguage.toLowerCase().trim();
     } else if (detectedLanguage.isNotEmpty) {
       searchStr = detectedLanguage.toLowerCase().trim();
+    } else {
+      final scriptCode = detectScriptCode(voiceTextController.text);
+      if (scriptCode != null) {
+        searchStr = scriptCode;
+      }
     }
 
     if (searchStr.isNotEmpty) {
@@ -2346,6 +2365,24 @@ class _AddProductPageState extends State<AddProductPage> {
       });
       return;
     }
+    final scriptCode = detectScriptCode(text);
+    if (scriptCode != null && selectedLanguage == 'Auto-Detect') {
+      const codeMap = {
+        'bn': 'bn-IN',
+        'gu': 'gu-IN',
+        'ta': 'ta-IN',
+        'te': 'te-IN',
+        'kn': 'kn-IN',
+        'ml': 'ml-IN',
+        'pa': 'pa-IN',
+        'hi': 'hi-IN',
+      };
+      if (codeMap.containsKey(scriptCode)) {
+        setState(() {
+          selectedLanguage = codeMap[scriptCode]!;
+        });
+      }
+    }
     setState(() => isTranslating = true);
     final res = await ApiService.translateText(text);
     if (mounted && res != null) {
@@ -2379,7 +2416,19 @@ class _AddProductPageState extends State<AddProductPage> {
 
   void _syncCatalogToControllers(Map<String, dynamic> catalog) {
     if (catalog['title'] != null && catalog['title'].toString().isNotEmpty) {
-      titleCtrl.text = catalog['title'];
+      final t = catalog['title'].toString();
+      titleCtrl.text = t;
+      if (t.runes.any((r) => r > 127)) {
+        ApiService.translateText(t, sourceLang: 'auto', targetLang: 'en').then((res) {
+          if (res != null && res['translated_text'] != null && res['translated_text'].toString().trim().isNotEmpty) {
+            if (mounted) {
+              setState(() {
+                titleCtrl.text = res['translated_text'].toString().trim();
+              });
+            }
+          }
+        });
+      }
     }
     if (catalog['description_en'] != null && catalog['description_en'].toString().isNotEmpty) {
       descEnCtrl.text = catalog['description_en'];
@@ -2683,7 +2732,8 @@ class _AddProductPageState extends State<AddProductPage> {
       'type_of_art': artType,
       'category': category,
       'description_en': descEn,
-      'description_hi': 'मास्टर भारतीय कारीगरों द्वारा हस्तनिर्मित उत्कृष्ट $title। प्रामाणिक पारंपरिक तकनीकों के साथ तैयार किया गया।',
+      'description_regional': '',
+      'description_hi': '',
       'materials': materials,
       'tags': tags,
       'status': 'Fallback Catalog',
@@ -2712,9 +2762,14 @@ class _AddProductPageState extends State<AddProductPage> {
       passUrl = rawImgUrl;
     }
 
+    final langDetails = _getActiveLanguageDetails();
+    final langToSend = (selectedLanguage != 'Auto-Detect') 
+        ? selectedLanguage 
+        : (langDetails['code'] ?? 'hi');
+
     Map<String, dynamic>? catalog = await ApiService.generateCatalog(
       text,
-      language: selectedLanguage,
+      language: langToSend,
       imageUrl: passUrl,
       imageBase64: passB64,
     );
@@ -3169,12 +3224,12 @@ class _AddProductPageState extends State<AddProductPage> {
 
   Widget _voiceStep() {
     final sampleVoices = [
-      {'lang': 'हिंदी (Hindi)', 'text': 'यह बनारसी सूती धागे से बनी हाथ से बुनी गई साड़ी है जिसमें सुंदर ज़री का काम है'},
-      {'lang': 'বাংলা (Bengali)', 'text': 'এটি প্রাকৃতিক বাঁশ দিয়ে তৈরি হাতে বোনা সুন্দর ঝুড়ি'},
-      {'lang': 'ગુજરાતી (Gujarati)', 'text': 'આ હાથથી બનાવેલું ટેરાકોટા માટીનું સુંદર માટલું છે'},
-      {'lang': 'मराठी (Marathi)', 'text': 'हे लाकडावर हस्तकला करून बनवलेले पारंपरिक शोकेस पीस आहे'},
-      {'lang': 'தமிழ் (Tamil)', 'text': 'இதுபாரம்பரிய தறி நெசவு மூலம் செய்யப்பட்ட கைத்தறி சேலை'},
-      {'lang': 'English', 'text': 'Handcrafted terracotta clay water pitcher made with natural bio clay'},
+      {'lang': 'हिंदी (Hindi)', 'code': 'hi-IN', 'text': 'यह बनारसी सूती धागे से बनी हाथ से बुनी गई साड़ी है जिसमें सुंदर ज़री का काम है'},
+      {'lang': 'বাংলা (Bengali)', 'code': 'bn-IN', 'text': 'এটি প্রাকৃতিক বাঁশ দিয়ে তৈরি হাতে বোনা সুন্দর ঝুড়ি'},
+      {'lang': 'ગુજરાતી (Gujarati)', 'code': 'gu-IN', 'text': 'આ હાથથી બનાવેલું ટેરાકોટા માટીનું સુંદર માટલું છે'},
+      {'lang': 'मराठी (Marathi)', 'code': 'mr-IN', 'text': 'हे लाकडावर हस्तकला करून बनवलेले पारंपरिक शोकेस पीस आहे'},
+      {'lang': 'தமிழ் (Tamil)', 'code': 'ta-IN', 'text': 'இதுபாரம்பரிய தறி நெசவு மூலம் செய்யப்பட்ட கைத்தறி சேலை'},
+      {'lang': 'English', 'code': 'en-US', 'text': 'Handcrafted terracotta clay water pitcher made with natural bio clay'},
     ];
 
     return SingleChildScrollView(
@@ -3412,6 +3467,9 @@ class _AddProductPageState extends State<AddProductPage> {
             onPressed: () {
               setState(() {
                 voiceTextController.text = v['text']!;
+                if (v['code'] != null && v['code']!.isNotEmpty) {
+                  selectedLanguage = v['code']!;
+                }
               });
               _translateCurrentText();
               ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -3431,7 +3489,10 @@ class _AddProductPageState extends State<AddProductPage> {
       setState(() => isListening = false);
     } else {
       setState(() => isListening = true);
-      final langCode = selectedLanguage == 'Auto-Detect' ? 'hi-IN' : selectedLanguage;
+      final langDetails = _getActiveLanguageDetails();
+      final langCode = selectedLanguage != 'Auto-Detect'
+          ? selectedLanguage
+          : (langDetails['code'] == 'en' ? 'en-US' : '${langDetails['code']}-IN');
       final success = SpeechService.startListening(
         languageCode: langCode,
         onResult: (text) {
@@ -3475,7 +3536,11 @@ class _AddProductPageState extends State<AddProductPage> {
         final file = result.files.first;
         if (file.bytes != null) {
           setState(() => processing = true);
-          final catalog = await ApiService.generateCatalogFromAudio(file.bytes!, file.name);
+          final langDetails = _getActiveLanguageDetails();
+          final langToSend = (selectedLanguage != 'Auto-Detect') 
+              ? selectedLanguage 
+              : (langDetails['code'] ?? 'hi');
+          final catalog = await ApiService.generateCatalogFromAudio(file.bytes!, file.name, language: langToSend);
           if (catalog != null) {
             _syncCatalogToControllers(catalog);
             generatedCatalogResult = catalog;

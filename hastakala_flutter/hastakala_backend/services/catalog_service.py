@@ -541,7 +541,13 @@ def generate_catalog_from_voice_or_text(
     raw_lang = (language or "").lower().strip()
     target_lang_code, target_lang_name = lang_code_map.get(raw_lang, (None, None))
     if not target_lang_code or target_lang_code == 'auto':
-        target_lang_code, target_lang_name = lang_code_map.get(detected_lang.lower().strip() if detected_lang else "", ("hi", "Hindi"))
+        target_lang_code, target_lang_name = lang_code_map.get(detected_lang.lower().strip() if detected_lang else "", (None, None))
+    if not target_lang_code or target_lang_code == 'auto':
+        script_code = detect_language_by_script(voice_text)
+        if script_code != 'en':
+            target_lang_code, target_lang_name = lang_code_map.get(script_code, ("hi", "Hindi"))
+        else:
+            target_lang_code, target_lang_name = ("hi", "Hindi")
 
     def _translate_desc_to_regional(en_desc: str, target_code: str) -> str:
         if not en_desc or target_code == "en":
@@ -553,6 +559,18 @@ def generate_catalog_from_voice_or_text(
         except Exception as ex:
             print(f"Error translating description to regional ({target_code}): {ex}")
         return en_desc
+
+    def _ensure_english_title(raw_t: str) -> str:
+        if not raw_t:
+            return "Handcrafted Artisan Product"
+        if detect_language_by_script(raw_t) != "en":
+            try:
+                trans_t = translate_regional_text(raw_t, source_lang="auto", target_lang="en")
+                if trans_t and trans_t.get("translated_text"):
+                    return trans_t["translated_text"]
+            except Exception:
+                pass
+        return raw_t
 
     # 1. Primary: Gemini 3.8 Flash AI Multimodal Call
     gemini_res = generate_with_gemini(
@@ -567,11 +585,13 @@ def generate_catalog_from_voice_or_text(
         model_name = gemini_res.get("model_used", "gemini-3.8-flash")
         desc_en = gemini_res.get("description_en")
         desc_regional = gemini_res.get("description_regional")
-        if not desc_regional or desc_regional == desc_en:
+        if not desc_regional or desc_regional == desc_en or detect_language_by_script(desc_regional) == "en":
             desc_regional = _translate_desc_to_regional(desc_en, target_lang_code)
 
+        title_en = _ensure_english_title(gemini_res.get("title"))
+
         return {
-            "title": gemini_res.get("title"),
+            "title": title_en,
             "type_of_art": gemini_res.get("type_of_art", "Traditional Indian Craft"),
             "category": gemini_res.get("category", "Artisanal Handicrafts  ›  Heritage Crafts"),
             "description_en": desc_en,
@@ -607,9 +627,10 @@ def generate_catalog_from_voice_or_text(
 
     desc_en = hq_res["description_en"]
     desc_regional = _translate_desc_to_regional(desc_en, target_lang_code)
+    title_en = _ensure_english_title(hq_res["title"])
 
     return {
-        "title": hq_res["title"],
+        "title": title_en,
         "type_of_art": art_type,
         "category": hq_res["category"],
         "description_en": desc_en,
