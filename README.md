@@ -4,7 +4,7 @@
 ### *AI-Powered Business Manager & B2B Marketplace for Traditional Indian Artisans*
 
 **Smart India Hackathon 2026 (SIH 2026)**  
-**Problem Statement ID:** `SIH26090` | **Team Name:** `AI-MIND-FORGE`
+**Problem Statement ID:** `SIH26090` | **Team Name:** `MIND-FORGE`
 
 [![SIH 2026](https://img.shields.io/badge/SIH-2026-orange.svg?style=for-the-badge&logo=target)](https://www.sih.gov.in/)
 [![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
@@ -424,15 +424,12 @@ Hastakala directly supports and aligns with flagship Government of India initiat
 - [x] Algorithmic Fair-Wage Dynamic Pricing Engine
 - [x] B2B Quotation Negotiation & Custom Order Sheet
 - [x] MongoDB Atlas Cloud Sync with SQLite Local Offline Cache
-- [ ] **Phase 2 (Post-Hackathon):** Direct GeM & ONDC seller API adapters for automated multi-channel publishing.
-- [ ] **Phase 3:** WhatsApp Business Bot interface for low-end feature phone artisans.
-- [ ] **Phase 4:** Blockchain-backed GI (Geographical Indication) Authenticity Certificates via NFC smart tags on handmade goods.
 
 ---
 
 ## 👥 Team & Contact
 
-**Team Name:** AI-MIND-FORGE  
+**Team Name:** MIND-FORGE  
 **Hackathon:** Smart India Hackathon 2026 (SIH 2026)  
 **Problem Statement ID:** `SIH26090`
 
@@ -442,5 +439,5 @@ Hastakala directly supports and aligns with flagship Government of India initiat
 ---
 
 <div align="center">
-  <sub>Built with ❤️ for Indian Master Artisans by <b>Team AI-Mind-Forge</b> | Smart India Hackathon 2026</sub>
+  <sub>Built with ❤️ for Indian Master Artisans by <b>Team Mind-Forge</b> | Smart India Hackathon 2026</sub>
 </div>
