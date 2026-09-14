@@ -104,16 +104,18 @@ class ApiService {
     String imageBase64 = '',
   }) async {
     try {
-      final res = await http.post(
-        Uri.parse('$baseUrl/api/catalog/generate'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'voice_text': voiceText,
-          'language': language,
-          'image_url': imageUrl,
-          'image_base64': imageBase64,
-        }),
-      );
+      final res = await http
+          .post(
+            Uri.parse('$baseUrl/api/catalog/generate'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'voice_text': voiceText,
+              'language': language,
+              'image_url': imageUrl.startsWith('data:') ? '' : imageUrl,
+              'image_base64': imageBase64.isNotEmpty ? imageBase64 : (imageUrl.startsWith('data:') ? imageUrl : ''),
+            }),
+          )
+          .timeout(const Duration(seconds: 15));
       if (res.statusCode == 200) {
         return jsonDecode(res.body);
       }

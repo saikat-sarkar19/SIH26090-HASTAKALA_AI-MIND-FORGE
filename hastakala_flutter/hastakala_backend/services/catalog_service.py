@@ -381,13 +381,12 @@ Return ONLY valid raw JSON format without markdown code blocks.
 
         # Model priority: prioritize reliable fast flash models, with cascade fallback
         models_to_try = [
-            GEMINI_MODEL or "gemini-3.5-flash",
-            "gemini-3.5-flash",
-            "gemini-3.8-flash",
-            "gemini-flash-latest",
-            "gemini-3.7-flash",
-            "gemini-3.6-flash",
-            "gemini-3.1-flash-lite",
+            GEMINI_MODEL or "gemini-2.5-flash",
+            "gemini-2.5-flash",
+            "gemini-2.0-flash",
+            "gemini-1.5-flash",
+            "gemini-1.5-pro",
+            "gemini-2.0-flash-exp",
         ]
 
         seen = set()
