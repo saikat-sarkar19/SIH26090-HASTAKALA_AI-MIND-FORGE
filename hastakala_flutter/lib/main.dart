@@ -2689,7 +2689,10 @@ class _AddProductPageState extends State<AddProductPage> {
   };
 
   Widget _photoStep() {
-    final hasEnhanced = enhancedImageResult != null;
+    final hasSelectedPhoto = selectedImageBytes != null;
+    final String studioImgUrl = (enhancedImageResult?['enhanced_image_url'] ?? '').toString().isNotEmpty
+        ? enhancedImageResult!['enhanced_image_url']
+        : (selectedImageBytes != null ? 'data:image/jpeg;base64,${base64Encode(selectedImageBytes!)}' : '');
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2781,7 +2784,7 @@ class _AddProductPageState extends State<AddProductPage> {
               borderRadius: BorderRadius.circular(20),
               border: Border.all(color: const Color(0xFFE2D8D1)),
             ),
-            child: hasEnhanced
+            child: hasSelectedPhoto
                 ? Column(
                     children: [
                       Expanded(
@@ -2822,7 +2825,7 @@ class _AddProductPageState extends State<AddProductPage> {
                                       child: ClipRRect(
                                         borderRadius: BorderRadius.circular(12),
                                         child: ApiService.buildProductImage(
-                                          enhancedImageResult!['enhanced_image_url'],
+                                          studioImgUrl,
                                           fit: BoxFit.cover,
                                           width: double.infinity,
                                         ),
@@ -2925,6 +2928,7 @@ class _AddProductPageState extends State<AddProductPage> {
 
   Future<void> _reEnhanceWithPhotoRoom() async {
     if (selectedImageBytes == null) return;
+    final rawB64 = 'data:image/jpeg;base64,${base64Encode(selectedImageBytes!)}';
     setState(() {
       processing = true;
       generatedCatalogResult = null;
@@ -2937,7 +2941,15 @@ class _AddProductPageState extends State<AddProductPage> {
     );
     if (mounted) {
       setState(() {
-        enhancedImageResult = result;
+        if (result != null && (result['enhanced_image_url'] ?? '').toString().isNotEmpty) {
+          enhancedImageResult = result;
+        } else if (enhancedImageResult == null) {
+          enhancedImageResult = {
+            'raw_image_url': rawB64,
+            'enhanced_image_url': rawB64,
+            'status': 'Original Preserved',
+          };
+        }
         processing = false;
       });
     }
@@ -2949,21 +2961,37 @@ class _AddProductPageState extends State<AddProductPage> {
       final picked = await picker.pickImage(source: source, imageQuality: 85);
       if (picked != null) {
         final bytes = await picked.readAsBytes();
+        final rawB64 = 'data:image/jpeg;base64,${base64Encode(bytes)}';
         setState(() {
           selectedImageBytes = bytes;
           originalFileName = picked.name;
           generatedCatalogResult = null;
+          enhancedImageResult = {
+            'raw_image_url': rawB64,
+            'enhanced_image_url': rawB64,
+            'status': 'Enhancing...',
+          };
           processing = true;
         });
+
         final result = await ApiService.enhanceImage(
           bytes,
           picked.name,
           bgStyle: selectedBgStyle,
           bgPrompt: customBgPromptCtrl.text,
         );
+
         if (mounted) {
           setState(() {
-            enhancedImageResult = result;
+            if (result != null && (result['enhanced_image_url'] ?? '').toString().isNotEmpty) {
+              enhancedImageResult = result;
+            } else {
+              enhancedImageResult = {
+                'raw_image_url': rawB64,
+                'enhanced_image_url': rawB64,
+                'status': 'Original Preserved',
+              };
+            }
             processing = false;
           });
         }
@@ -2971,7 +2999,7 @@ class _AddProductPageState extends State<AddProductPage> {
     } catch (e) {
       if (mounted) {
         setState(() => processing = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Image selection error: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Image selection notice: $e')));
       }
     }
   }
