@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hastakala/services/api_service.dart';
+import 'package:hastakala/services/session_service.dart';
 
 class BuyerAuthPage extends StatefulWidget {
   final Function(Map<String, dynamic> session) onBuyerLoggedIn;
@@ -90,6 +91,8 @@ class _BuyerAuthPageState extends State<BuyerAuthPage> {
     setState(() => loading = false);
 
     if (res != null && res['status'] == 'success' && res['buyer'] != null) {
+      await SessionService.saveBuyerSession(res['buyer']);
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Welcome back, ${res['buyer']['organization_name'] ?? 'Buyer'}! 🎉')),
       );
@@ -142,6 +145,8 @@ class _BuyerAuthPageState extends State<BuyerAuthPage> {
     setState(() => loading = false);
 
     if (res != null && res['status'] == 'success' && res['buyer'] != null) {
+      await SessionService.saveBuyerSession(res['buyer']);
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Buyer Account created! Welcome, $org! 🎉')),
       );
