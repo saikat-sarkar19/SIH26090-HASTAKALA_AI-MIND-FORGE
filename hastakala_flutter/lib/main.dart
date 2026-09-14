@@ -12,7 +12,21 @@ import 'package:hastakala/screens/buyer_auth_page.dart';
 import 'package:hastakala/screens/artisan_enquiries_page.dart';
 
 
-void main() => runApp(const HastakalaApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final saved = await SessionService.getSavedSession();
+  if (saved != null && saved['type'] == 'artisan' && saved['data'] != null) {
+    currentArtisanSession = saved['data'] as Map<String, dynamic>;
+    currentBuyerSession = null;
+  } else if (saved != null && saved['type'] == 'buyer' && saved['data'] != null) {
+    currentBuyerSession = saved['data'] as Map<String, dynamic>;
+    currentArtisanSession = null;
+  } else {
+    currentArtisanSession = null;
+    currentBuyerSession = null;
+  }
+  runApp(HastakalaApp(initialSession: saved));
+}
 
 class AppColors {
   static const wine = Color(0xFF7A0B2E);
@@ -70,10 +84,24 @@ void switchToArtisan([BuildContext? ctx]) {
 }
 
 class HastakalaApp extends StatelessWidget {
-  const HastakalaApp({super.key});
+  final Map<String, dynamic>? initialSession;
+  const HastakalaApp({super.key, this.initialSession});
 
   @override
   Widget build(BuildContext context) {
+    Widget initialScreen;
+    if (initialSession != null && initialSession!['type'] == 'artisan' && currentArtisanSession != null) {
+      initialScreen = const HomeScreen();
+    } else if (initialSession != null && initialSession!['type'] == 'buyer' && currentBuyerSession != null) {
+      initialScreen = BuyerHomeScreen(
+        buyerSession: currentBuyerSession,
+        onSwitchToArtisan: switchToArtisan,
+        onLogout: logoutBuyer,
+      );
+    } else {
+      initialScreen = const SplashScreen();
+    }
+
     return MaterialApp(
       navigatorKey: rootNavigatorKey,
       title: 'Hastakala',
@@ -89,7 +117,7 @@ class HastakalaApp extends StatelessWidget {
         ),
         fontFamily: 'sans-serif',
       ),
-      home: const SplashScreen(),
+      home: initialScreen,
     );
   }
 }
@@ -454,24 +482,28 @@ class _SplashScreenState extends State<SplashScreen> {
     if (saved != null && saved['type'] == 'artisan' && saved['data'] != null) {
       currentArtisanSession = saved['data'] as Map<String, dynamic>;
       currentBuyerSession = null;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
-      );
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        rootNavigatorKey.currentState?.pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
+          (route) => false,
+        );
+      });
       return;
     } else if (saved != null && saved['type'] == 'buyer' && saved['data'] != null) {
       currentBuyerSession = saved['data'] as Map<String, dynamic>;
       currentArtisanSession = null;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => BuyerHomeScreen(
-            buyerSession: currentBuyerSession,
-            onSwitchToArtisan: switchToArtisan,
-            onLogout: logoutBuyer,
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        rootNavigatorKey.currentState?.pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (_) => BuyerHomeScreen(
+              buyerSession: currentBuyerSession,
+              onSwitchToArtisan: switchToArtisan,
+              onLogout: logoutBuyer,
+            ),
           ),
-        ),
-      );
+          (route) => false,
+        );
+      });
       return;
     }
 
@@ -846,7 +878,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                           padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
-                        onPressed: () {
+                        onPressed: () async {
                           currentBuyerSession = {
                             'id': 0,
                             'organization_name': 'Guest Buyer Organization',
@@ -855,6 +887,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             'buyer_type': 'Wholesale Buyer',
                             'location': 'India',
                           };
+                          await SessionService.saveBuyerSession(currentBuyerSession!);
                           rootNavigatorKey.currentState?.pushAndRemoveUntil(
                             MaterialPageRoute(
                               builder: (_) => BuyerHomeScreen(
@@ -890,7 +923,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(height: 12),
                       TextButton(
-                        onPressed: () {
+                        onPressed: () async {
                           currentArtisanSession = {
                             'id': 0,
                             'name': 'Guest Artisan',
@@ -900,7 +933,10 @@ class _LoginScreenState extends State<LoginScreen> {
                             'craft_type': 'Handloom & Handicrafts',
                             'location': 'India',
                           };
-                          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
+                          await SessionService.saveArtisanSession(currentArtisanSession!);
+                          if (context.mounted) {
+                            Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
+                          }
                         },
                         child: const Text('Continue as Guest Artisan', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w600, fontSize: 13)),
                       ),
