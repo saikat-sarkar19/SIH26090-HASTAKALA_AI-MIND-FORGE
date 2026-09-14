@@ -2821,14 +2821,10 @@ class _AddProductPageState extends State<AddProductPage> {
                                     Expanded(
                                       child: ClipRRect(
                                         borderRadius: BorderRadius.circular(12),
-                                        child: Image.network(
-                                          ApiService.getFullImageUrl(enhancedImageResult!['enhanced_image_url']),
+                                        child: ApiService.buildProductImage(
+                                          enhancedImageResult!['enhanced_image_url'],
                                           fit: BoxFit.cover,
                                           width: double.infinity,
-                                          errorBuilder: (c, e, s) => Container(
-                                            color: Colors.white,
-                                            child: const Center(child: Icon(Icons.auto_awesome, color: AppColors.gold, size: 40)),
-                                          ),
                                         ),
                                       ),
                                     ),
@@ -3324,10 +3320,9 @@ class _AddProductPageState extends State<AddProductPage> {
               height: 160,
               clipBehavior: Clip.antiAlias,
               decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.gold)),
-              child: Image.network(
-                ApiService.getFullImageUrl(enhancedImageResult!['enhanced_image_url']),
+              child: ApiService.buildProductImage(
+                enhancedImageResult!['enhanced_image_url'],
                 fit: BoxFit.cover,
-                errorBuilder: (c, e, s) => Container(color: AppColors.cream, child: const Icon(Icons.image_outlined, size: 60, color: AppColors.wine)),
               ),
             ),
           const SizedBox(height: 16),

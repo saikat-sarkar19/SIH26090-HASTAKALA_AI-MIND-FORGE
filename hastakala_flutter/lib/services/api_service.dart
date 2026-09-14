@@ -276,13 +276,17 @@ class ApiService {
 
   // Helper to full image URL
   static String getFullImageUrl(String relativePath) {
-    if (relativePath.startsWith('http://') || relativePath.startsWith('https://')) {
-      return relativePath;
+    final path = relativePath.trim();
+    if (path.startsWith('http://') ||
+        path.startsWith('https://') ||
+        path.startsWith('data:image/') ||
+        path.startsWith('data:application/')) {
+      return path;
     }
-    if (!relativePath.startsWith('/')) {
-      relativePath = '/$relativePath';
+    if (!path.startsWith('/')) {
+      return '$baseUrl/$path';
     }
-    return '$baseUrl$relativePath';
+    return '$baseUrl$path';
   }
 
   // Universal Widget Builder for Product Images (Handles Base64 Data URIs, Assets, and Network URLs seamlessly)
