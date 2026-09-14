@@ -1716,71 +1716,77 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   @override
-  Widget build(BuildContext context) => SafeArea(
-    child: RefreshIndicator(
-      onRefresh: _loadDashboardData,
-      child: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          Row(children: [
-            buildArtisanAvatar(
-              radius: 22,
-              showEditBadge: true,
-              onTap: () => _showProfileModal(context),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: GestureDetector(
+  Widget build(BuildContext context) {
+    final activeEnquiries = enquiries.where((e) {
+      final st = (e['status'] ?? '').toString().toLowerCase();
+      return st != 'completed' && st != 'rejected';
+    }).toList();
+
+    return SafeArea(
+      child: RefreshIndicator(
+        onRefresh: _loadDashboardData,
+        child: ListView(
+          padding: const EdgeInsets.all(20),
+          children: [
+            Row(children: [
+              buildArtisanAvatar(
+                radius: 22,
+                showEditBadge: true,
                 onTap: () => _showProfileModal(context),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Namaste, ${(currentArtisanSession?['name'] ?? 'Artisan').split(' ').first}! 🙏',
-                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                    ),
-                  ],
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => _showProfileModal(context),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Namaste, ${(currentArtisanSession?['name'] ?? 'Artisan').split(' ').first}! 🙏',
+                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.account_circle_outlined, color: AppColors.wine, size: 26),
-              tooltip: 'Profile Details',
-              onPressed: () => _showProfileModal(context),
-            ),
-            IconButton(icon: const Icon(Icons.refresh), onPressed: _loadDashboardData),
-          ]),
+              IconButton(
+                icon: const Icon(Icons.account_circle_outlined, color: AppColors.wine, size: 26),
+                tooltip: 'Profile Details',
+                onPressed: () => _showProfileModal(context),
+              ),
+              IconButton(icon: const Icon(Icons.refresh), onPressed: _loadDashboardData),
+            ]),
 
-          const SizedBox(height: 20),
-          Row(children: [
-            Expanded(child: QuickAction(
-              icon: Icons.camera_alt_outlined, label: 'Add New\nProduct', color: const Color(0xFFFFD9D4),
-              onTap: () => widget.onNavigateTab?.call(2),
-            )),
-            const SizedBox(width: 12),
-            Expanded(child: QuickAction(
-              icon: Icons.handshake_outlined, label: 'Find\nBuyers', color: const Color(0xFFFFEDC8),
-              onTap: () => widget.onNavigateTab?.call(3),
-            )),
-          ]),
-          const SizedBox(height: 12),
-          Row(children: [
-            Expanded(child: QuickAction(
-              icon: Icons.inventory_2_outlined, label: 'My\nProducts', color: const Color(0xFFD9F0E3),
-              onTap: () => widget.onNavigateTab?.call(1),
-            )),
-            const SizedBox(width: 12),
-            Expanded(child: QuickAction(
-              icon: Icons.person_outline, label: 'My\nProfile', color: const Color(0xFFE6DEFF),
-              onTap: () => widget.onNavigateTab?.call(4),
-            )),
-          ]),
-          const SizedBox(height: 24),
-          Row(
+            const SizedBox(height: 20),
+            Row(children: [
+              Expanded(child: QuickAction(
+                icon: Icons.camera_alt_outlined, label: 'Add New\nProduct', color: const Color(0xFFFFD9D4),
+                onTap: () => widget.onNavigateTab?.call(2),
+              )),
+              const SizedBox(width: 12),
+              Expanded(child: QuickAction(
+                icon: Icons.handshake_outlined, label: 'Find\nBuyers', color: const Color(0xFFFFEDC8),
+                onTap: () => widget.onNavigateTab?.call(3),
+              )),
+            ]),
+            const SizedBox(height: 12),
+            Row(children: [
+              Expanded(child: QuickAction(
+                icon: Icons.inventory_2_outlined, label: 'My\nProducts', color: const Color(0xFFD9F0E3),
+                onTap: () => widget.onNavigateTab?.call(1),
+              )),
+              const SizedBox(width: 12),
+              Expanded(child: QuickAction(
+                icon: Icons.person_outline, label: 'My\nProfile', color: const Color(0xFFE6DEFF),
+                onTap: () => widget.onNavigateTab?.call(4),
+              )),
+            ]),
+            const SizedBox(height: 24),
+            Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text('Recent Enquiries 📩', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.wine)),
-              if (enquiries.isNotEmpty)
+              if (activeEnquiries.isNotEmpty)
                 GestureDetector(
                   onTap: () => widget.onNavigateTab?.call(3),
                   child: Container(
@@ -1790,7 +1796,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      '${enquiries.length} Active Lead${enquiries.length > 1 ? 's' : ''}',
+                      '${activeEnquiries.length} Active Lead${activeEnquiries.length > 1 ? 's' : ''}',
                       style: const TextStyle(color: AppColors.green, fontWeight: FontWeight.bold, fontSize: 11),
                     ),
                   ),
@@ -1798,8 +1804,8 @@ class _DashboardPageState extends State<DashboardPage> {
             ],
           ),
           const SizedBox(height: 12),
-          if (enquiries.isNotEmpty) ...[
-            ...enquiries.take(3).map((enq) {
+          if (activeEnquiries.isNotEmpty) ...[
+            ...activeEnquiries.take(3).map((enq) {
               final status = enq['status'] ?? 'New Lead';
               final qty = enq['order_quantity'] ?? 50;
               final price = enq['offer_price']?.toInt() ?? 450;
@@ -1928,6 +1934,7 @@ class _DashboardPageState extends State<DashboardPage> {
       ),
     ),
   );
+}
 }
 
 class QuickAction extends StatelessWidget {
