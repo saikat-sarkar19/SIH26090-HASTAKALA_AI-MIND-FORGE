@@ -159,9 +159,22 @@ def enhance_product_image_with_photoroom(
             "Soft Drop Shadow Synthesized"
         ]
 
+    # Convert enhanced image bytes to Base64 Data URI so it works on Vercel / serverless without ephemeral disk 404s
+    import base64
+    raw_b64 = f"data:image/jpeg;base64,{base64.b64encode(image_bytes).decode('utf-8')}"
+    enhanced_b64 = raw_b64
+    if os.path.exists(enhanced_path):
+        try:
+            with open(enhanced_path, "rb") as ef:
+                enhanced_b64 = f"data:image/png;base64,{base64.b64encode(ef.read()).decode('utf-8')}"
+        except Exception as e:
+            print(f"Error reading enhanced image bytes: {e}")
+
     return {
-        "raw_image_url": f"/uploads/{raw_filename}",
-        "enhanced_image_url": f"/uploads/enhanced/{enhanced_filename}",
+        "raw_image_url": raw_b64,
+        "enhanced_image_url": enhanced_b64,
+        "raw_file_path": f"/uploads/{raw_filename}",
+        "enhanced_file_path": f"/uploads/enhanced/{enhanced_filename}",
         "status": "Enhanced Successfully",
         "bg_style": bg_style,
         "bg_prompt": bg_prompt,

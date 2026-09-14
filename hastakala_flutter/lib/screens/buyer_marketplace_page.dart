@@ -152,17 +152,14 @@ class _BuyerMarketplacePageState extends State<BuyerMarketplacePage> {
                       child: Stack(
                         fit: StackFit.expand,
                         children: [
-                          if ((p['enhanced_image_url'] ?? p['raw_image_url'] ?? '').toString().isNotEmpty)
-                            GestureDetector(
-                              onTap: () => ApiService.showImagePreviewDialog(context, p['enhanced_image_url'] ?? p['raw_image_url']),
-                              child: Image.network(
-                                ApiService.getFullImageUrl(p['enhanced_image_url'] ?? p['raw_image_url']),
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => _imagePlaceholder(),
-                              ),
-                            )
-                          else
-                            _imagePlaceholder(),
+                          GestureDetector(
+                            onTap: () => ApiService.showImagePreviewDialog(context, p['enhanced_image_url'] ?? p['raw_image_url']),
+                            child: ApiService.buildProductImage(
+                              p['enhanced_image_url'] ?? p['raw_image_url'],
+                              fit: BoxFit.cover,
+                              fallback: _imagePlaceholder(),
+                            ),
+                          ),
                           Positioned(
                             top: 12,
                             right: 12,
@@ -709,13 +706,11 @@ class _BuyerMarketplacePageState extends State<BuyerMarketplacePage> {
                 color: Colors.grey.shade100,
               ),
               clipBehavior: Clip.antiAlias,
-              child: ((r['enhanced_image_url'] ?? r['raw_image_url'] ?? '').toString().isNotEmpty)
-                  ? Image.network(
-                      ApiService.getFullImageUrl(r['enhanced_image_url'] ?? r['raw_image_url']),
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _imagePlaceholder(),
-                    )
-                  : _imagePlaceholder(),
+              child: ApiService.buildProductImage(
+                r['enhanced_image_url'] ?? r['raw_image_url'],
+                fit: BoxFit.cover,
+                fallback: _imagePlaceholder(),
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -789,13 +784,11 @@ class _BuyerMarketplacePageState extends State<BuyerMarketplacePage> {
                       border: Border.all(color: Colors.grey.shade200),
                     ),
                     clipBehavior: Clip.antiAlias,
-                    child: ((p['enhanced_image_url'] ?? p['raw_image_url'] ?? '').toString().isNotEmpty)
-                        ? Image.network(
-                            ApiService.getFullImageUrl(p['enhanced_image_url'] ?? p['raw_image_url']),
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => _imagePlaceholder(),
-                          )
-                        : _imagePlaceholder(),
+                    child: ApiService.buildProductImage(
+                      p['enhanced_image_url'] ?? p['raw_image_url'],
+                      fit: BoxFit.cover,
+                      fallback: _imagePlaceholder(),
+                    ),
                   ),
                   const SizedBox(width: 14),
                   // Core Info

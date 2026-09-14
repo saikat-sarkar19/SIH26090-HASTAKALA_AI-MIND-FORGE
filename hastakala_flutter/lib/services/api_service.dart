@@ -285,13 +285,85 @@ class ApiService {
     return '$baseUrl$relativePath';
   }
 
+  // Universal Widget Builder for Product Images (Handles Base64 Data URIs, Assets, and Network URLs seamlessly)
+  static Widget buildProductImage(
+    String? rawPath, {
+    BoxFit fit = BoxFit.cover,
+    double? width,
+    double? height,
+    Widget? fallback,
+  }) {
+    final path = (rawPath ?? '').trim();
+    final defaultFallback = fallback ??
+        Image.asset(
+          'assets/images/artisan_art.jpg',
+          fit: fit,
+          width: width,
+          height: height,
+          errorBuilder: (_, __, ___) => Container(
+            color: const Color(0xFFE9DED3),
+            width: width,
+            height: height,
+            child: const Icon(Icons.image_outlined, size: 48, color: Color(0xFF7A0B2E)),
+          ),
+        );
+
+    if (path.isEmpty) return defaultFallback;
+
+    // 1. Data URI (Base64 encoded image string)
+    if (path.startsWith('data:image/') || path.startsWith('data:application/')) {
+      try {
+        final commaIdx = path.indexOf(',');
+        final base64Str = commaIdx != -1 ? path.substring(commaIdx + 1) : path;
+        final bytes = base64Decode(base64Str.replaceAll(RegExp(r'\s+'), ''));
+        return Image.memory(
+          bytes,
+          fit: fit,
+          width: width,
+          height: height,
+          errorBuilder: (c, e, s) => defaultFallback,
+        );
+      } catch (e) {
+        debugPrint('Error decoding base64 image: $e');
+        return defaultFallback;
+      }
+    }
+
+    // 2. Local Asset image
+    if (path.startsWith('assets/')) {
+      return Image.asset(
+        path,
+        fit: fit,
+        width: width,
+        height: height,
+        errorBuilder: (c, e, s) => defaultFallback,
+      );
+    }
+
+    // 3. HTTP / HTTPS or Relative Server URL
+    final fullUrl = getFullImageUrl(path);
+    return Image.network(
+      fullUrl,
+      fit: fit,
+      width: width,
+      height: height,
+      loadingBuilder: (c, child, progress) {
+        if (progress == null) return child;
+        return Container(
+          width: width,
+          height: height,
+          color: const Color(0xFFF3E4CF),
+          child: const Center(child: CircularProgressIndicator(color: Color(0xFF7A0B2E), strokeWidth: 2)),
+        );
+      },
+      errorBuilder: (c, e, s) => defaultFallback,
+    );
+  }
+
   // Show Fullscreen Image Preview Modal with Close (X) button at top-right
   static void showImagePreviewDialog(BuildContext context, String? rawImageUrl) {
     final imgPath = (rawImageUrl ?? '').trim();
     if (imgPath.isEmpty) return;
-
-    final isAsset = imgPath.startsWith('assets/');
-    final fullUrl = isAsset ? imgPath : getFullImageUrl(imgPath);
 
     showDialog(
       context: context,
@@ -322,27 +394,7 @@ class ApiService {
                 panEnabled: true,
                 minScale: 0.8,
                 maxScale: 4.0,
-                child: isAsset
-                    ? Image.asset(imgPath, fit: BoxFit.contain)
-                    : Image.network(
-                        fullUrl,
-                        fit: BoxFit.contain,
-                        loadingBuilder: (c, child, progress) {
-                          if (progress == null) return child;
-                          return Container(
-                            height: 280,
-                            width: double.infinity,
-                            color: Colors.black87,
-                            child: const Center(
-                              child: CircularProgressIndicator(color: Color(0xFFD8A54A)),
-                            ),
-                          );
-                        },
-                        errorBuilder: (c, e, s) => Image.asset(
-                          'assets/images/artisan_art.jpg',
-                          fit: BoxFit.contain,
-                        ),
-                      ),
+                child: buildProductImage(imgPath, fit: BoxFit.contain),
               ),
             ),
 

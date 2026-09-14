@@ -2626,6 +2626,16 @@ class _AddProductPageState extends State<AddProductPage> {
         : int.tryParse(currentArtisanSession?['id']?.toString() ?? '');
     final String? artisanUsername = currentArtisanSession?['username']?.toString();
 
+    final String fallbackB64 = (selectedImageBytes != null && selectedImageBytes!.isNotEmpty)
+        ? 'data:image/jpeg;base64,${base64Encode(selectedImageBytes!)}'
+        : '';
+    final String rawImgUri = (enhancedImageResult?['raw_image_url'] ?? '').toString().isNotEmpty
+        ? enhancedImageResult!['raw_image_url']
+        : fallbackB64;
+    final String enhancedImgUri = (enhancedImageResult?['enhanced_image_url'] ?? '').toString().isNotEmpty
+        ? enhancedImageResult!['enhanced_image_url']
+        : rawImgUri;
+
     final success = await ApiService.publishProduct({
       'title': titleCtrl.text.isNotEmpty ? titleCtrl.text : 'Handcrafted Artisan Product',
       'type_of_art': artTypeCtrl.text.isNotEmpty ? artTypeCtrl.text : 'Traditional Indian Craft',
@@ -2651,8 +2661,8 @@ class _AddProductPageState extends State<AddProductPage> {
       'production_time': '${(laborHours / 8).ceil()}–${(laborHours / 8).ceil() + 2} days',
       'artisan_name': currentArtisanSession?['name'] ?? 'Ramesh Kumar',
       'artisan_location': currentArtisanSession?['location'] ?? 'West Bengal',
-      'raw_image_url': enhancedImageResult?['raw_image_url'] ?? '',
-      'enhanced_image_url': enhancedImageResult?['enhanced_image_url'] ?? '',
+      'raw_image_url': rawImgUri,
+      'enhanced_image_url': enhancedImgUri,
       if (artisanId != null) 'artisan_id': artisanId,
       if (artisanUsername != null) 'artisan_username': artisanUsername,
     });
@@ -3847,13 +3857,9 @@ class _ProductsPageState extends State<ProductsPage> {
                           borderRadius: BorderRadius.circular(18),
                           border: Border.all(color: AppColors.gold, width: 1.5),
                         ),
-                        child: Image.network(
-                          ApiService.getFullImageUrl(p['enhanced_image_url'] ?? p['raw_image_url']),
+                        child: ApiService.buildProductImage(
+                          p['enhanced_image_url'] ?? p['raw_image_url'],
                           fit: BoxFit.cover,
-                          errorBuilder: (c, e, s) => Container(
-                            color: const Color(0xFFE9DED3),
-                            child: const Icon(Icons.image_outlined, size: 60, color: AppColors.wine),
-                          ),
                         ),
                       ),
                       Positioned(
@@ -4169,13 +4175,11 @@ class _ProductsPageState extends State<ProductsPage> {
                                     child: Container(
                                       color: const Color(0xFFE9DED3),
                                       width: double.infinity,
-                                      child: imgUrl.isNotEmpty
-                                          ? Image.network(
-                                              ApiService.getFullImageUrl(imgUrl),
-                                              fit: BoxFit.cover,
-                                              errorBuilder: (c, e, s) => const Icon(Icons.image_outlined, size: 48, color: AppColors.wine),
-                                            )
-                                          : const Icon(Icons.image_outlined, size: 48, color: AppColors.wine),
+                                      child: ApiService.buildProductImage(
+                                        imgUrl,
+                                        fit: BoxFit.cover,
+                                        width: double.infinity,
+                                      ),
                                     ),
                                   ),
                                   Padding(
