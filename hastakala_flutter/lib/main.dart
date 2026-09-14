@@ -2384,9 +2384,12 @@ class _AddProductPageState extends State<AddProductPage> {
     if (catalog['description_en'] != null && catalog['description_en'].toString().isNotEmpty) {
       descEnCtrl.text = catalog['description_en'];
     }
-    final regDesc = catalog['description_regional'] ?? catalog['description_hi'];
-    if (regDesc != null && regDesc.toString().isNotEmpty) {
-      descHiCtrl.text = regDesc.toString();
+    final regDesc = (catalog['description_regional'] ?? catalog['description_hi'] ?? '').toString();
+    if (regDesc.isNotEmpty && regDesc.trim() != descEnCtrl.text.trim()) {
+      descHiCtrl.text = regDesc;
+    } else if (descEnCtrl.text.trim().isNotEmpty) {
+      // Automatically translate English description into the user's chosen voice catalog language
+      _translateEnToRegional();
     }
     if (catalog['type_of_art'] != null && catalog['type_of_art'].toString().isNotEmpty) {
       artTypeCtrl.text = catalog['type_of_art'];
@@ -2725,6 +2728,9 @@ class _AddProductPageState extends State<AddProductPage> {
         processing = false;
         step = 2; // Jump to Review Step
       });
+      if (descHiCtrl.text.trim().isEmpty || descHiCtrl.text.trim() == descEnCtrl.text.trim()) {
+        _translateEnToRegional();
+      }
       final artType = catalog['type_of_art'] ?? 'Artisan Craft';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -3515,7 +3521,7 @@ class _AddProductPageState extends State<AddProductPage> {
           _editableField('Type of Art / Craft Heritage', artTypeCtrl, hintText: 'e.g. Terracotta Pottery, Handloom Weaving'),
           _editableField('Category', catCtrl, hintText: 'e.g. Pottery & Clay, Handloom & Textiles'),
           _editableField('English Description (SEO)', descEnCtrl, maxLines: 4, onChanged: _onEnChanged, hintText: 'Detailed e-commerce product description in English'),
-          _editableField('Regional Description', descHiCtrl, maxLines: 3, onChanged: _onRegionalChanged, hintText: 'विवरण / Regional description'),
+          _editableField('${_getActiveLanguageDetails()['name'] ?? 'Regional'} Description', descHiCtrl, maxLines: 3, onChanged: _onRegionalChanged, hintText: 'विवरण / ${_getActiveLanguageDetails()['name'] ?? 'Regional'} description'),
           _editableField('Materials', matCtrl, hintText: 'e.g. Natural Bio-Clay, Organic Cotton'),
           _editableField('Tags', tagsCtrl, hintText: 'e.g. Handmade • Artisanal • Sustainable'),
         ],

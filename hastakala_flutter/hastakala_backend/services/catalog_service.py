@@ -108,9 +108,9 @@ def translate_regional_text(text: str, source_lang: str = "auto", target_lang: s
         r_gt = requests.get(url_gt, headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
         if r_gt.status_code == 200:
             gt_json = r_gt.json()
-            if gt_json and len(gt_json) > 0 and len(gt_json[0]) > 0 and len(gt_json[0][0]) > 0:
-                translated_gt = gt_json[0][0][0]
-                if translated_gt and translated_gt.strip():
+            if gt_json and len(gt_json) > 0 and isinstance(gt_json[0], list):
+                translated_gt = "".join(part[0] for part in gt_json[0] if part and isinstance(part, list) and len(part) > 0 and part[0]).strip()
+                if translated_gt:
                     return {
                         "detected_language": script_lang_name,
                         "detected_code": det_script,
@@ -525,7 +525,34 @@ def generate_catalog_from_voice_or_text(
     translated_en = trans_res["translated_text"]
     original_text = trans_res["original_text"]
 
-    target_lang_name = detected_lang if detected_lang and detected_lang != "English" else "Hindi"
+    # Map input language to 2-letter Google Translate target code and language name
+    lang_code_map = {
+        "hi-in": ("hi", "Hindi"), "hi": ("hi", "Hindi"), "hindi": ("hi", "Hindi"),
+        "bn-in": ("bn", "Bengali"), "bn": ("bn", "Bengali"), "bengali": ("bn", "Bengali"), "bangla": ("bn", "Bengali"),
+        "gu-in": ("gu", "Gujarati"), "gu": ("gu", "Gujarati"), "gujarati": ("gu", "Gujarati"),
+        "mr-in": ("mr", "Marathi"), "mr": ("mr", "Marathi"), "marathi": ("mr", "Marathi"),
+        "ta-in": ("ta", "Tamil"), "ta": ("ta", "Tamil"), "tamil": ("ta", "Tamil"),
+        "te-in": ("te", "Telugu"), "te": ("te", "Telugu"), "telugu": ("te", "Telugu"),
+        "kn-in": ("kn", "Kannada"), "kn": ("kn", "Kannada"), "kannada": ("kn", "Kannada"),
+        "ml-in": ("ml", "Malayalam"), "ml": ("ml", "Malayalam"), "malayalam": ("ml", "Malayalam"),
+        "pa-in": ("pa", "Punjabi"), "pa": ("pa", "Punjabi"), "punjabi": ("pa", "Punjabi"),
+        "en-us": ("en", "English"), "en": ("en", "English"), "english": ("en", "English"),
+    }
+    raw_lang = (language or "").lower().strip()
+    target_lang_code, target_lang_name = lang_code_map.get(raw_lang, (None, None))
+    if not target_lang_code or target_lang_code == 'auto':
+        target_lang_code, target_lang_name = lang_code_map.get(detected_lang.lower().strip() if detected_lang else "", ("hi", "Hindi"))
+
+    def _translate_desc_to_regional(en_desc: str, target_code: str) -> str:
+        if not en_desc or target_code == "en":
+            return en_desc
+        try:
+            trans = translate_regional_text(en_desc, source_lang="en", target_lang=target_code)
+            if trans and trans.get("translated_text"):
+                return trans["translated_text"]
+        except Exception as ex:
+            print(f"Error translating description to regional ({target_code}): {ex}")
+        return en_desc
 
     # 1. Primary: Gemini 3.8 Flash AI Multimodal Call
     gemini_res = generate_with_gemini(
@@ -538,16 +565,22 @@ def generate_catalog_from_voice_or_text(
     )
     if gemini_res and gemini_res.get("description_en") and gemini_res.get("title"):
         model_name = gemini_res.get("model_used", "gemini-3.8-flash")
+        desc_en = gemini_res.get("description_en")
+        desc_regional = gemini_res.get("description_regional")
+        if not desc_regional or desc_regional == desc_en:
+            desc_regional = _translate_desc_to_regional(desc_en, target_lang_code)
+
         return {
             "title": gemini_res.get("title"),
             "type_of_art": gemini_res.get("type_of_art", "Traditional Indian Craft"),
             "category": gemini_res.get("category", "Artisanal Handicrafts  ›  Heritage Crafts"),
-            "description_en": gemini_res.get("description_en"),
-            "description_regional": gemini_res.get("description_en"),
-            "description_hi": gemini_res.get("description_en"),
+            "description_en": desc_en,
+            "description_regional": desc_regional,
+            "description_hi": desc_regional,
             "materials": gemini_res.get("materials", "Natural Eco-Friendly Materials"),
             "tags": gemini_res.get("tags", "Handmade • Heritage • Artisanal • Sustainable"),
-            "detected_language": detected_lang,
+            "detected_language": detected_lang or target_lang_name,
+            "regional_language": target_lang_name,
             "original_text": original_text,
             "translated_english": translated_en,
             "transcription": original_text or "Voice note audio processed successfully.",
@@ -572,16 +605,20 @@ def generate_catalog_from_voice_or_text(
     elif "wood" in cat_lower:
         art_type = "Wood Carving"
 
+    desc_en = hq_res["description_en"]
+    desc_regional = _translate_desc_to_regional(desc_en, target_lang_code)
+
     return {
         "title": hq_res["title"],
         "type_of_art": art_type,
         "category": hq_res["category"],
-        "description_en": hq_res["description_en"],
-        "description_regional": hq_res["description_en"],
-        "description_hi": hq_res["description_en"],
+        "description_en": desc_en,
+        "description_regional": desc_regional,
+        "description_hi": desc_regional,
         "materials": hq_res["materials"],
         "tags": hq_res["tags"],
-        "detected_language": detected_lang,
+        "detected_language": detected_lang or target_lang_name,
+        "regional_language": target_lang_name,
         "original_text": original_text,
         "translated_english": translated_en,
         "transcription": original_text or "Voice note audio processed successfully.",
