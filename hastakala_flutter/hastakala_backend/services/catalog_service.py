@@ -367,7 +367,7 @@ def generate_with_gemini(
     Analyzes product photo (via visual image bytes/url) and artisan voice description
     to generate high-converting e-commerce titles, SEO descriptions, type of art, category, materials, and tags.
     """
-    api_key = GEMINI_API_KEY or "AQ.Ab8RN6LSa0bLqHsax2_KqnxBGQ_uX8lfksj4LMgbtCyLyUo9vw"
+    api_key = GEMINI_API_KEY
 
     try:
         parts = []
@@ -466,10 +466,16 @@ Return ONLY valid raw JSON format without markdown code blocks.
                 seen.add(m)
                 unique_models.append(m)
 
+        headers = {
+            "Content-Type": "application/json",
+            "x-goog-api-key": api_key,
+            "Authorization": f"Bearer {api_key}",
+        }
+
         for model in unique_models:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
             try:
-                r = requests.post(url, json=body, timeout=20)
+                r = requests.post(url, json=body, headers=headers, timeout=20)
                 if r.status_code == 200:
                     data = r.json()
                     text_resp = data["candidates"][0]["content"]["parts"][0]["text"].strip()

@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:hastakala/services/api_service.dart';
 import 'package:hastakala/services/speech_service.dart';
+import 'package:hastakala/services/session_service.dart';
 import 'package:hastakala/screens/buyer_home_screen.dart';
 import 'package:hastakala/screens/buyer_auth_page.dart';
 import 'package:hastakala/screens/artisan_enquiries_page.dart';
@@ -27,8 +28,10 @@ class AppColors {
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
-void logoutBuyer([BuildContext? ctx]) {
+void logoutBuyer([BuildContext? ctx]) async {
+  await SessionService.clearSession();
   currentBuyerSession = null;
+  currentArtisanSession = null;
   final nav = rootNavigatorKey.currentState;
   if (nav != null) {
     nav.pushAndRemoveUntil(
@@ -99,27 +102,8 @@ Widget logo({double width = 150}) => Image.asset(
 );
 
 
-Map<String, dynamic>? currentBuyerSession = {
-  'id': 1,
-  'organization_name': 'FabIndia B2B Procurement',
-  'contact_person': 'Sunita Verma',
-  'username': 'fabindia_buyer',
-  'buyer_type': 'Corporate Wholesale Buyer',
-  'location': 'Mumbai, Maharashtra',
-  'contact_email': 'b2b@fabindia.com',
-  'phone': '+91 98200 11223',
-};
-
-Map<String, dynamic>? currentArtisanSession = {
-  'id': 1,
-  'name': 'Ramesh Kumar',
-  'username': 'ramesh_artisan',
-  'phone': '9876543210',
-  'gender': 'Male',
-  'craft_type': 'Master Weaver & Bamboo Craftsman',
-  'location': 'Varanasi, Uttar Pradesh',
-  'profile_picture': '',
-};
+Map<String, dynamic>? currentBuyerSession;
+Map<String, dynamic>? currentArtisanSession;
 
 Map<String, Map<String, dynamic>> defaultAvatarPresets = {
   'preset:weaver': {'name': 'Handloom Weaver', 'color': Color(0xFF7A0B2E), 'icon': Icons.texture},
@@ -230,7 +214,10 @@ Future<void> saveArtisanProfilePicture(BuildContext context, String pictureValue
 
       if (res != null && res['status'] == 'success' && res['artisan'] != null) {
         currentArtisanSession = res['artisan'];
+        await SessionService.saveArtisanSession(currentArtisanSession!);
         if (onUpdated != null) onUpdated();
+      } else if (currentArtisanSession != null) {
+        await SessionService.saveArtisanSession(currentArtisanSession!);
       }
 
       if (context.mounted) {
@@ -444,39 +431,96 @@ class PageShell extends StatelessWidget {
   );
 }
 
-class SplashScreen extends StatelessWidget {
+class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: const Color(0xFF080A18),
-    body: SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(28),
-        child: Column(
-          children: [
-            const Spacer(),
-            logo(width: 260),
-            const SizedBox(height: 28),
-            const Text(
-              'Traditional Artisans.\nGlobal Opportunities.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Color(0xFFFFE4B5), fontSize: 18, height: 1.5),
-            ),
-            const Spacer(),
-            AppButton(
-              text: 'Get Started',
-              icon: Icons.arrow_forward,
-              onPressed: () => Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (_) => const LoginScreen()),
+  State<SplashScreen> createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends State<SplashScreen> {
+  bool checkingSession = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkSavedSession();
+  }
+
+  Future<void> _checkSavedSession() async {
+    final saved = await SessionService.getSavedSession();
+    if (!mounted) return;
+
+    if (saved != null && saved['type'] == 'artisan' && saved['data'] != null) {
+      currentArtisanSession = saved['data'] as Map<String, dynamic>;
+      currentBuyerSession = null;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
+      );
+      return;
+    } else if (saved != null && saved['type'] == 'buyer' && saved['data'] != null) {
+      currentBuyerSession = saved['data'] as Map<String, dynamic>;
+      currentArtisanSession = null;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => BuyerHomeScreen(
+            buyerSession: currentBuyerSession,
+            onSwitchToArtisan: switchToArtisan,
+            onLogout: logoutBuyer,
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (mounted) {
+      setState(() => checkingSession = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (checkingSession) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF080A18),
+        body: Center(
+          child: CircularProgressIndicator(color: AppColors.gold),
+        ),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: const Color(0xFF080A18),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            children: [
+              const Spacer(),
+              logo(width: 260),
+              const SizedBox(height: 28),
+              const Text(
+                'Traditional Artisans.\nGlobal Opportunities.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Color(0xFFFFE4B5), fontSize: 18, height: 1.5),
               ),
-            ),
-          ],
+              const Spacer(),
+              AppButton(
+                text: 'Get Started',
+                icon: Icons.arrow_forward,
+                onPressed: () => Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class LoginScreen extends StatefulWidget {
@@ -522,6 +566,8 @@ class _LoginScreenState extends State<LoginScreen> {
         if (!mounted) return;
         if (res != null && res['status'] == 'success' && res['buyer'] != null) {
           currentBuyerSession = res['buyer'];
+          await SessionService.saveBuyerSession(currentBuyerSession!);
+          if (!mounted) return;
           final orgName = res['buyer']?['organization_name'] ?? 'Buyer';
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Welcome back, $orgName! 🏛️')),
@@ -550,6 +596,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
         if (res != null && res['status'] == 'success') {
           currentArtisanSession = res['artisan'];
+          await SessionService.saveArtisanSession(currentArtisanSession!);
+          if (!mounted) return;
           final artisanName = res['artisan']?['name'] ?? 'Artisan';
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Welcome back, $artisanName! 🎉')),
@@ -960,6 +1008,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     if (res != null && res['status'] == 'success') {
       currentArtisanSession = res['artisan'];
+      await SessionService.saveArtisanSession(currentArtisanSession!);
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Registration successful! Welcome to Hastakala, $fullName! 🎉')),
       );
@@ -1431,18 +1481,20 @@ class _DashboardPageState extends State<DashboardPage> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: () {
+                      onPressed: () async {
                         Navigator.pop(ctx);
-                        setState(() {
-                          currentArtisanSession = null;
-                        });
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Logged out successfully.')),
-                        );
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(builder: (_) => const LoginScreen()),
-                        );
+                        await SessionService.clearSession();
+                        currentArtisanSession = null;
+                        currentBuyerSession = null;
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Logged out successfully.')),
+                          );
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(builder: (_) => const LoginScreen()),
+                          );
+                        }
                       },
                       icon: const Icon(Icons.logout, color: Colors.red, size: 18),
                       label: const Text('Logout', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
@@ -4671,17 +4723,19 @@ class _ProfilePageState extends State<ProfilePage> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () {
-                      setState(() {
-                        currentArtisanSession = null;
-                      });
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Logged out successfully.')),
-                      );
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(builder: (_) => const LoginScreen()),
-                      );
+                    onPressed: () async {
+                      await SessionService.clearSession();
+                      currentArtisanSession = null;
+                      currentBuyerSession = null;
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Logged out successfully.')),
+                        );
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(builder: (_) => const LoginScreen()),
+                        );
+                      }
                     },
                     icon: const Icon(Icons.logout, color: Colors.red, size: 18),
                     label: const Text('Logout', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
