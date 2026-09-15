@@ -436,21 +436,20 @@ def generate_with_gemini(
             artisan_voice_context = "No voice note provided. Analyze the uploaded product photo directly and identify what item is shown."
 
         prompt = f"""You are an expert AI business cataloger and senior e-commerce copywriter for Hastakala - an e-commerce marketplace for Indian artisans and craftspeople.
-Carefully inspect the provided product image. {artisan_voice_context}
+Carefully inspect the provided product photo AND the artisan's description.
+{artisan_voice_context}
 
 CRITICAL RULES:
-1. The "title" MUST ALWAYS BE IN ENGLISH (only English letters, ASCII, never regional scripts like Bengali, Hindi, Gujarati, Tamil, etc.), no matter what language the voice note is in! Example: "Handcrafted Terracotta Clay Flower Vase", "Handwoven Banarasi Silk Saree", "Eco-Friendly Bamboo Basket".
-2. Base your classification PRIMARILY on what is actually visible in the image!
-3. Accurately identify and describe what is visible in the image (e.g., bottle, vase, pot, saree, wood carving, dokra metal sculpture, bamboo basket, etc.). Do NOT invent a pot or saree if the photo shows a bottle!
-4. Identify the authentic craft style, materials, shape, and visual attributes.
+1. DYNAMIC SYNTHESIS: Generate the product title and SEO description by directly combining what is actually visible in the product image (shape, colors, textures, details, plants/items shown) WITH the artisan's description. Both inputs must shape the final catalog!
+2. The "title" MUST ALWAYS BE IN ENGLISH (only English letters, ASCII, never regional scripts like Bengali, Hindi, Gujarati, Tamil, etc.), no matter what language the voice note is in! Must be an accurate, attractive 3-6 word e-commerce product title based on the photo and artisan description. Example: "Handcrafted Terracotta Flower Vase Planter", "Handwoven Banarasi Zari Silk Saree", "Handcrafted Eco-Friendly Bamboo Basket".
+3. "description_en": A rich, captivating 3-4 sentence e-commerce SEO product description in English that vividly synthesizes the visual attributes seen in the photo (materials, pottery, colors, foliage, finish) together with the artisan's heritage story and functional utility for modern wholesale and retail buyers.
+4. "type_of_art": Authentic Indian craft heritage or craft style (e.g. "Terracotta Pottery", "Handloom Weaving", "Dokra Metal Craft", "Madhubani Painting", "Bamboo & Cane Craft", "Wood Carving", etc.).
+5. "category": Relevant marketplace category (e.g. "Kitchen & Dining  ›  Terracotta Pottery", "Home & Living  ›  Artisan Decor", "Textiles & Apparel  ›  Sarees & Handloom", "Bamboo & Cane", "Metal Craft", "Wood Carving").
+6. "materials": Primary craft materials visible in the image and described by the artisan.
+7. "tags": 5 bullet-separated tags highlighting craft, material, and utility.
 
 Generate a structured JSON object with these exact keys:
-1. "title": An accurate 3-6 word English product title based on what is shown in the image.
-2. "type_of_art": Craft heritage or craft style (e.g. "Handcrafted Bottle & Drinkware", "Terracotta Pottery", "Dokra Metal Craft", "Madhubani Painting", "Handloom Weaving", "Wood Carving", etc.).
-3. "category": Relevant marketplace category (e.g. "Kitchen & Dining  ›  Artisan Drinkware & Bottles", "Pottery & Clay", "Handloom & Textiles", "Bamboo & Cane", "Metal Craft", "Wood Carving", "Home & Living").
-4. "description_en": A rich, captivating 3-4 sentence e-commerce SEO product description in English accurately describing the item's visual colors, shape, materials, and purpose.
-5. "materials": Primary materials visible/described.
-6. "tags": 5 bullet-separated tags (e.g. "Bottle • Handcrafted • Artisanal • Sustainable • Drinkware").
+"title", "type_of_art", "category", "description_en", "materials", "tags"
 
 Return ONLY valid raw JSON format without markdown code blocks.
 """
@@ -461,12 +460,13 @@ Return ONLY valid raw JSON format without markdown code blocks.
             "generationConfig": {"responseMimeType": "application/json"}
         }
 
-        # Official Google Gemini 1.5 Flash Vision models
+        # Official Google Gemini Flash Vision models
         models_to_try = [
-            GEMINI_MODEL or "gemini-1.5-flash",
-            "gemini-1.5-flash",
-            "gemini-1.5-pro",
-            "gemini-2.0-flash-exp",
+            GEMINI_MODEL or "gemini-3.6-flash",
+            "gemini-3.6-flash",
+            "gemini-3.8-flash",
+            "gemini-3.5-flash",
+            "gemini-flash-latest",
         ]
 
         seen = set()
@@ -479,13 +479,13 @@ Return ONLY valid raw JSON format without markdown code blocks.
         headers = {
             "Content-Type": "application/json",
             "x-goog-api-key": api_key,
-            "Authorization": f"Bearer {api_key}",
         }
 
         for model in unique_models:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
             try:
-                r = requests.post(url, json=body, headers=headers, timeout=20)
+                r = requests.post(url, json=body, headers=headers, timeout=25)
+                print(f"[Gemini Model {model}] Status: {r.status_code}")
                 if r.status_code == 200:
                     data = r.json()
                     text_resp = data["candidates"][0]["content"]["parts"][0]["text"].strip()
@@ -500,7 +500,10 @@ Return ONLY valid raw JSON format without markdown code blocks.
                             parsed["tags"] = " • ".join(str(t) for t in parsed["tags"])
                         parsed["model_used"] = model
                         return parsed
+                else:
+                    print(f"[Gemini Error {model}] {r.text[:300]}")
             except Exception as ex:
+                print(f"[Gemini Exception {model}] {ex}")
                 continue
 
         # If Gemini API returns error/quota, analyze visual image features (shape & color) dynamically with Pillow!

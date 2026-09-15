@@ -33,7 +33,7 @@ MONGODB_DB_NAME = os.getenv("MONGODB_DB_NAME", "hastakala_db")
 _DEFAULT_GEMINI_KEY = "".join(["AQ", ".Ab8RN6ICAUoW", "tBD7QaltDW0z", "_s_0rzzvkkHoo9XXkW2aZXbRvQ"])
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", _DEFAULT_GEMINI_KEY)
 PHOTOROOM_API_KEY = os.getenv("PHOTOROOM_API_KEY", "sandbox_sk_pr_default_1d1f867fc8626c9c4639838a4178f762219c4f9c")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
 
 HOST = "0.0.0.0"
 PORT = 8000
