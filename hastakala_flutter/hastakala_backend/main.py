@@ -277,6 +277,22 @@ async def enhance_image_endpoint(
 def translate_endpoint(req: TranslateRequest):
     return translate_regional_text(req.text, source_lang=req.source_lang or "auto", target_lang=req.target_lang or "en")
 
+@app.get("/api/catalog/debug_gemini")
+def debug_gemini_endpoint():
+    import requests
+    from hastakala_backend.config import GEMINI_API_KEY, GEMINI_MODEL
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
+    try:
+        r = requests.post(url, json={"contents": [{"parts": [{"text": "Say OK"}]}]}, headers={"Content-Type": "application/json"}, timeout=10)
+        return {
+            "status_code": r.status_code,
+            "response": r.json() if r.status_code == 200 else r.text,
+            "key_prefix": GEMINI_API_KEY[:8] if GEMINI_API_KEY else "NONE",
+            "model": GEMINI_MODEL
+        }
+    except Exception as e:
+        return {"error": str(e), "key_prefix": GEMINI_API_KEY[:8] if GEMINI_API_KEY else "NONE", "model": GEMINI_MODEL}
+
 @app.post("/api/catalog/generate")
 def generate_catalog_endpoint(req: CatalogRequest):
     result = generate_catalog_from_voice_or_text(
