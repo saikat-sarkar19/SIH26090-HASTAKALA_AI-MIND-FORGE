@@ -281,17 +281,37 @@ def translate_endpoint(req: TranslateRequest):
 def debug_gemini_endpoint():
     import requests
     from hastakala_backend.config import GEMINI_API_KEY, GEMINI_MODEL
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
+    key = GEMINI_API_KEY or ""
+    # Test 1: with key in query param
+    url1 = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={key}"
+    # Test 2: with x-goog-api-key header
+    url2 = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent"
+    
+    r1 = None
+    r2 = None
     try:
-        r = requests.post(url, json={"contents": [{"parts": [{"text": "Say OK"}]}]}, headers={"Content-Type": "application/json"}, timeout=10)
-        return {
-            "status_code": r.status_code,
-            "response": r.json() if r.status_code == 200 else r.text,
-            "key_prefix": GEMINI_API_KEY[:8] if GEMINI_API_KEY else "NONE",
-            "model": GEMINI_MODEL
-        }
+        r1 = requests.post(url1, json={"contents": [{"parts": [{"text": "Say OK"}]}]}, headers={"Content-Type": "application/json"}, timeout=10)
     except Exception as e:
-        return {"error": str(e), "key_prefix": GEMINI_API_KEY[:8] if GEMINI_API_KEY else "NONE", "model": GEMINI_MODEL}
+        r1_err = str(e)
+    else:
+        r1_err = None
+
+    try:
+        r2 = requests.post(url2, json={"contents": [{"parts": [{"text": "Say OK"}]}]}, headers={"Content-Type": "application/json", "x-goog-api-key": key}, timeout=10)
+    except Exception as e:
+        r2_err = str(e)
+    else:
+        r2_err = None
+
+    return {
+        "key_len": len(key),
+        "key_prefix": key[:8] if key else "NONE",
+        "key_suffix": key[-6:] if key else "NONE",
+        "r1_query_status": r1.status_code if r1 else r1_err,
+        "r1_body": (r1.json() if r1 and r1.status_code == 200 else (r1.text if r1 else r1_err)),
+        "r2_header_status": r2.status_code if r2 else r2_err,
+        "r2_body": (r2.json() if r2 and r2.status_code == 200 else (r2.text if r2 else r2_err)),
+    }
 
 @app.post("/api/catalog/generate")
 def generate_catalog_endpoint(req: CatalogRequest):
